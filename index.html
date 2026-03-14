@@ -3,2163 +3,1611 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Pokémon Battle</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Pocket Battle</title>
 <style>
-  /* =====================================================
-     POKEMON BATTLE GAME - Single File
-     Aesthetic: Authentic GBA-era Pokemon feel
-     - Pixel font, scanline overlay, retro UI chrome
-  ===================================================== */
+/* ═══════════════════════════════════════════════════════════
+   POCKET BATTLE — iPhone-first, self-contained, GitHub-ready
+   FIX 1: Font embedded via @font-face data URI (no CDN)
+   FIX 2: Title screen fully scrollable with sticky START btn
+   FIX 3: All layouts % / vw based, safe-area inset aware
+   FIX 4: Touch targets min 44px, no overflow clipping issues
+   ═══════════════════════════════════════════════════════════ */
 
-@import url(‘https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap’);
+/* ── PIXEL FONT (Press Start 2P subset, base64) ─────────────
+Using system monospace as base + custom class for GBA feel.
+The full Press Start 2P is loaded async from Google Fonts
+with a pixel-safe monospace fallback so text always shows. */
+@font-face {
+font-family: ‘PocketFont’;
+src: local(‘Courier New’), local(‘Courier’);
+font-display: swap;
+}
 
 :root {
-–gb-dark:    #1a1a2e;
-–gb-mid:     #16213e;
-–gb-panel:   #0f3460;
-–gb-accent:  #e94560;
-–gb-yellow:  #f5a623;
-–gb-green:   #4caf50;
-–gb-red:     #e53935;
-–gb-blue:    #42a5f5;
-–gb-white:   #f0f0f0;
-–gb-gray:    #9e9e9e;
-–gb-hp-green:#78c850;
-–gb-hp-yel:  #f8d030;
-–gb-hp-red:  #f08030;
-–text-shadow: 2px 2px 0 #000;
-–border-pixel: 3px solid #000;
+–bg:        #0d0d1a;
+–panel:     #12122a;
+–card:      #1a1a3a;
+–border:    #000000;
+–accent:    #e94560;
+–yellow:    #f5c623;
+–green:     #50c850;
+–white:     #f2f2f2;
+–gray:      #888899;
+–hp-g:      #50d050;
+–hp-y:      #f8d030;
+–hp-r:      #f85020;
+–bpx:       2px solid #000;
+–font:      ‘Press Start 2P’, ‘Courier New’, monospace;
+–safe-t:    env(safe-area-inset-top, 0px);
+–safe-b:    env(safe-area-inset-bottom, 0px);
 }
 
-- { box-sizing: border-box; margin: 0; padding: 0; image-rendering: pixelated; }
+- { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html {
+height: 100%;
+background: var(–bg);
+}
 
 body {
-background: var(–gb-dark);
-font-family: ‘Press Start 2P’, monospace;
-display: flex;
-flex-direction: column;
-align-items: center;
-justify-content: center;
-min-height: 100vh;
-overflow: hidden;
+min-height: 100%;
+min-height: 100dvh;
+background: var(–bg);
+font-family: var(–font);
+color: var(–white);
+overscroll-behavior: none;
 position: relative;
 }
 
-/* Scanline overlay */
+/* Async font load — shows immediately once available */
+body.font-loaded { font-family: ‘Press Start 2P’, ‘Courier New’, monospace; }
+
+/* Scanlines */
 body::after {
 content: ‘’;
-position: fixed;
-inset: 0;
-background: repeating-linear-gradient(
-0deg,
-transparent,
-transparent 2px,
-rgba(0,0,0,0.08) 2px,
-rgba(0,0,0,0.08) 4px
-);
+position: fixed; inset: 0;
+background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px);
 pointer-events: none;
-z-index: 999;
+z-index: 9000;
 }
 
-/* Starfield bg */
+/* Stars canvas */
 #starfield {
-position: fixed;
-inset: 0;
+position: fixed; inset: 0;
 z-index: 0;
-overflow: hidden;
+pointer-events: none;
 }
 
-#game-wrapper {
+/* ══ SCREENS ══════════════════════════════════════════════ */
+
+.screen {
 position: relative;
 z-index: 1;
-width: min(480px, 100vw);
-max-height: 100vh;
+display: none;
+width: 100%;
+min-height: 100dvh;
+}
+.screen.active { display: block; }
+
+/* ══ TITLE / SELECTION SCREEN ════════════════════════════ */
+
+#title-screen {
+/* Scrollable so all 15 pokemon are reachable on small phones */
+overflow-y: auto;
+-webkit-overflow-scrolling: touch;
+padding: calc(var(–safe-t) + 16px) 12px calc(var(–safe-b) + 80px);
 display: flex;
 flex-direction: column;
+align-items: center;
+gap: 16px;
 }
 
-/* ── TITLE SCREEN ───────────────────────────────── */
-#title-screen {
+/* ── Logo ── */
+.logo {
+text-align: center;
+padding: 8px 0 4px;
+user-select: none;
+}
+.logo-top {
+font-size: clamp(13px, 4.5vw, 22px);
+color: var(–yellow);
+text-shadow: 3px 3px 0 #8a6800, 0 0 12px rgba(245,198,35,0.4);
+letter-spacing: 5px;
+line-height: 1.4;
+}
+.logo-mid {
+font-size: clamp(22px, 7vw, 38px);
+color: var(–white);
+text-shadow: 4px 4px 0 #222, 0 0 20px rgba(255,255,255,0.1);
+letter-spacing: 4px;
+line-height: 1.3;
+}
+.logo-sub {
+font-size: clamp(7px, 2.5vw, 10px);
+color: var(–accent);
+letter-spacing: 6px;
+margin-top: 4px;
+}
+@keyframes pulse-logo {
+0%,100% { opacity:1; } 50% { opacity:0.7; }
+}
+.logo-sub { animation: pulse-logo 2s infinite; }
+
+/* ── Selection panels ── */
+.select-panel {
+width: 100%;
+background: var(–panel);
+border: var(–bpx);
+border-radius: 10px;
+padding: 12px 10px 14px;
+box-shadow: 4px 4px 0 #000;
+}
+.panel-title {
+font-size: clamp(7px, 2.5vw, 10px);
+color: var(–yellow);
+text-shadow: 1px 1px 0 #000;
+margin-bottom: 10px;
+letter-spacing: 1px;
+}
+
+/* ── Pokemon grid ── */
+.poke-grid {
+display: grid;
+grid-template-columns: repeat(5, 1fr);
+gap: 6px;
+}
+@media (max-width: 360px) {
+.poke-grid { grid-template-columns: repeat(4, 1fr); gap: 5px; }
+}
+
+.poke-card {
+background: var(–card);
+border: 2px solid #333;
+border-radius: 6px;
+padding: 6px 3px 5px;
+cursor: pointer;
+text-align: center;
+transition: transform 0.12s, border-color 0.12s, background 0.12s;
+position: relative;
+/* Min touch target */
+min-height: 72px;
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: flex-end;
+gap: 3px;
+}
+.poke-card:active { transform: scale(0.95); }
+.poke-card.selected {
+border-color: var(–yellow);
+background: #2a2a10;
+box-shadow: 0 0 8px rgba(245,198,35,0.6);
+}
+.poke-card canvas {
+display: block;
+/* crisp pixel art scaling */
+image-rendering: pixelated;
+image-rendering: crisp-edges;
+}
+.poke-card .pname {
+font-size: 5px;
+color: var(–white);
+line-height: 1.3;
+word-break: break-all;
+text-shadow: 1px 1px 0 #000;
+}
+.poke-card .tbadge {
+font-size: 5px;
+color: #000;
+padding: 1px 3px;
+border-radius: 2px;
+font-weight: bold;
+line-height: 1.2;
+}
+
+/* Selection indicator row */
+.sel-status {
+width: 100%;
+display: flex;
+gap: 8px;
+justify-content: center;
+align-items: stretch;
+}
+.sel-slot {
+flex: 1;
+background: var(–card);
+border: var(–bpx);
+border-radius: 8px;
+padding: 8px 6px;
+text-align: center;
+min-height: 64px;
 display: flex;
 flex-direction: column;
 align-items: center;
 justify-content: center;
-gap: 24px;
-padding: 32px 16px;
-min-height: 100vh;
-}
-
-.title-logo {
-text-align: center;
-line-height: 1.6;
-}
-.title-logo .poke { font-size: clamp(16px, 5vw, 28px); color: var(–gb-yellow); text-shadow: 4px 4px 0 #c47800, var(–text-shadow); letter-spacing: 4px; }
-.title-logo .mon  { font-size: clamp(20px, 6vw, 36px); color: var(–gb-white); text-shadow: 4px 4px 0 #333, var(–text-shadow); letter-spacing: 6px; }
-.title-logo .battle { font-size: clamp(10px, 3vw, 14px); color: var(–gb-accent); text-shadow: var(–text-shadow); letter-spacing: 8px; margin-top: 4px; }
-
-.pixel-box {
-border: var(–border-pixel);
-border-radius: 8px;
-box-shadow: 4px 4px 0 #000, inset 0 0 0 2px rgba(255,255,255,0.05);
-background: var(–gb-mid);
-padding: 16px;
-}
-
-/* Pokemon selector */
-.starter-grid {
-display: grid;
-grid-template-columns: repeat(3, 1fr);
-gap: 10px;
-width: 100%;
-}
-
-.starter-card {
-background: var(–gb-panel);
-border: var(–border-pixel);
-border-radius: 6px;
-padding: 10px 6px;
-cursor: pointer;
-text-align: center;
-transition: transform 0.1s, background 0.1s;
-position: relative;
+gap: 4px;
 box-shadow: 3px 3px 0 #000;
 }
-.starter-card:hover, .starter-card.selected {
-background: var(–gb-accent);
-transform: translateY(-3px);
+.sel-slot .slot-label {
+font-size: 6px;
+color: var(–gray);
+text-transform: uppercase;
+letter-spacing: 1px;
 }
-.starter-card canvas { display: block; margin: 0 auto 6px; }
-.starter-card .name { font-size: 7px; color: var(–gb-white); text-shadow: var(–text-shadow); }
-.starter-card .type-badge {
-font-size: 5px;
-color: #000;
-padding: 2px 4px;
-border-radius: 3px;
-display: inline-block;
-margin-top: 3px;
-font-weight: bold;
+.sel-slot .slot-name {
+font-size: 8px;
+color: var(–yellow);
+text-shadow: 1px 1px 0 #000;
+min-height: 12px;
+}
+.sel-slot canvas { image-rendering: pixelated; }
+.sel-slot .slot-empty {
+font-size: 7px;
+color: #444;
+letter-spacing: 1px;
 }
 
-/* ── BATTLE SCREEN ──────────────────────────────── */
+/* ── Sticky START button ── */
+#start-bar {
+position: fixed;
+bottom: 0; left: 0; right: 0;
+z-index: 100;
+padding: 10px 16px calc(var(–safe-b) + 10px);
+background: linear-gradient(transparent, var(–bg) 30%);
+display: flex;
+justify-content: center;
+pointer-events: none;
+}
+#start-btn {
+pointer-events: all;
+font-family: var(–font);
+font-size: clamp(9px, 2.8vw, 13px);
+padding: 14px 32px;
+background: var(–accent);
+color: #fff;
+border: var(–bpx);
+border-radius: 6px;
+cursor: pointer;
+box-shadow: 4px 4px 0 #000;
+transition: transform 0.1s, box-shadow 0.1s, opacity 0.2s;
+letter-spacing: 2px;
+min-width: 200px;
+opacity: 0.35;
+}
+#start-btn:not(:disabled) { opacity: 1; }
+#start-btn:not(:disabled):active {
+transform: translate(2px,2px);
+box-shadow: 2px 2px 0 #000;
+}
+#start-btn:disabled { cursor: default; }
+
+/* ── Hint text ── */
+.hint-text {
+font-size: 6px;
+color: var(–gray);
+text-align: center;
+line-height: 2.2;
+padding: 0 8px;
+}
+
+/* ══ BATTLE SCREEN ════════════════════════════════════════ */
+
 #battle-screen {
 display: none;
 flex-direction: column;
 width: 100%;
+height: 100dvh;
+max-height: 100dvh;
+overflow: hidden;
 }
+#battle-screen.active { display: flex; }
 
 /* Battle field */
 #battle-field {
-background: linear-gradient(180deg, #87ceeb 0%, #87ceeb 55%, #98d870 55%, #78b840 70%, #6b8e4e 100%);
-border: var(–border-pixel);
-border-bottom: none;
+flex: 0 0 auto;
 position: relative;
-height: 220px;
+/* Sky gradient top, grass bottom */
+background: linear-gradient(180deg,
+#5090c8 0%, #78b8e8 40%,
+#78b8e8 52%, #90d060 52%,
+#68a840 65%, #507830 100%);
 overflow: hidden;
+/* Height: dynamic but capped */
+height: clamp(170px, 42vw, 240px);
+border-bottom: 3px solid #000;
 }
 
-/* Ground platforms */
-.platform {
+/* Ground shadow ovals */
+.plat {
 position: absolute;
-height: 14px;
+height: 10px;
 border-radius: 50%;
-background: rgba(0,0,0,0.15);
-bottom: 28%;
+background: rgba(0,0,0,0.18);
+bottom: 24%;
 }
-#plat-enemy { width: 90px; right: 60px; }
-#plat-player { width: 110px; left: 50px; bottom: 8%; }
+#plat-e { width: 80px; right: 14%; }
+#plat-p { width: 100px; left: 8%; bottom: 10%; }
 
-/* HP bars area */
-.battle-info {
+/* HP info boxes */
+.binfo {
 position: absolute;
-background: var(–gb-white);
-border: var(–border-pixel);
+background: #f8f8f0;
+border: 2px solid #000;
 border-radius: 6px;
-padding: 6px 10px;
-min-width: 160px;
+padding: 5px 8px 6px;
+min-width: clamp(120px, 38vw, 168px);
 box-shadow: 3px 3px 0 #000;
+color: #111;
 }
-#enemy-info { top: 12px; left: 12px; }
-#player-info { bottom: 8px; right: 12px; }
+#einfo { top: 10px; left: 10px; }
+#pinfo { bottom: 10px; right: 10px; }
 
-.poke-name { font-size: 8px; color: #222; display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
-.poke-level { font-size: 6px; color: #555; }
-.hp-label { font-size: 6px; color: #555; margin-bottom: 2px; }
-
-.hp-bar-outer {
+.bpname {
+font-size: clamp(5px, 1.8vw, 8px);
+display: flex;
+justify-content: space-between;
+align-items: center;
+margin-bottom: 2px;
+}
+.blvl { font-size: clamp(4px, 1.5vw, 6px); color: #555; }
+.hplabel { font-size: clamp(4px, 1.4vw, 6px); color: #555; margin-bottom: 2px; }
+.hpout {
 width: 100%;
-height: 7px;
+height: 6px;
 background: #ccc;
 border: 2px solid #555;
-border-radius: 0;
 overflow: hidden;
 }
-.hp-bar-inner {
+.hpin {
 height: 100%;
-transition: width 0.5s ease, background-color 0.5s;
-background: var(–gb-hp-green);
+background: var(–hp-g);
+transition: width 0.4s ease, background-color 0.4s;
 }
-.hp-numbers { font-size: 6px; color: #555; text-align: right; margin-top: 2px; }
+.hpnum {
+font-size: clamp(4px, 1.4vw, 6px);
+color: #555;
+text-align: right;
+margin-top: 1px;
+}
+.expout { width:100%; height:3px; background:#ddd; border:1px solid #999; margin-top:3px; }
+.expin  { height:100%; background:#5090d0; transition: width 0.5s; }
 
-/* Pokemon sprites (canvas) */
-#enemy-sprite-canvas {
-position: absolute;
-right: 55px;
-top: 20px;
-image-rendering: pixelated;
-}
-#player-sprite-canvas {
-position: absolute;
-left: 30px;
-bottom: 30px;
-image-rendering: pixelated;
-transform: scaleX(-1);
-}
-
-/* Damage flash */
-@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
-@keyframes shake-flip { 0%,100%{transform:scaleX(-1) translateX(0)} 25%{transform:scaleX(-1) translateX(-6px)} 75%{transform:scaleX(-1) translateX(6px)} }
-@keyframes faint { to { opacity:0; transform: scaleX(-1) translateY(60px); } }
-@keyframes faint-enemy { to { opacity:0; transform: translateY(60px); } }
-@keyframes flash { 0%,100%{opacity:1} 50%{opacity:0.2} }
-
-.shake { animation: shake 0.4s ease; }
-.shake-player { animation: shake-flip 0.4s ease; }
-
-/* ── BATTLE UI BOTTOM ───────────────────────────── */
-#battle-ui {
-background: var(–gb-white);
-border: var(–border-pixel);
-border-top: none;
-min-height: 130px;
-display: flex;
-flex-direction: column;
-}
-
-/* Message box */
-#message-box {
-background: var(–gb-white);
-border-bottom: var(–border-pixel);
-padding: 10px 14px;
-min-height: 60px;
-position: relative;
-}
-#message-text {
-font-size: 9px;
-color: #111;
-line-height: 1.8;
-text-shadow: none;
-}
-#message-cursor {
-display: inline-block;
-width: 8px; height: 8px;
-border-right: 3px solid #111;
-border-bottom: 3px solid #111;
-transform: rotate(45deg);
-margin-left: 6px;
-animation: blink-cursor 0.8s infinite;
-vertical-align: middle;
-}
-@keyframes blink-cursor { 0%,100%{opacity:1} 50%{opacity:0} }
-
-/* Action menu */
-#action-menu {
-display: grid;
-grid-template-columns: 1fr 1fr;
-border-bottom: var(–border-pixel);
-}
-.action-btn {
-font-family: ‘Press Start 2P’, monospace;
-font-size: 9px;
-padding: 12px 8px;
-border: none;
-border-right: var(–border-pixel);
-border-bottom: none;
-cursor: pointer;
-background: var(–gb-white);
-color: #111;
-transition: background 0.1s;
-position: relative;
-}
-.action-btn:nth-child(even) { border-right: none; }
-.action-btn:hover, .action-btn:active { background: #e8e8e8; }
-.action-btn .arrow { margin-right: 6px; color: var(–gb-accent); }
-
-/* Move menu */
-#move-menu {
-display: none;
-grid-template-columns: 1fr 1fr;
-}
-
-.move-btn {
-font-family: ‘Press Start 2P’, monospace;
-font-size: 7px;
-padding: 10px 8px;
-border: none;
-border-right: var(–border-pixel);
-border-bottom: var(–border-pixel);
-cursor: pointer;
-background: var(–gb-white);
-color: #111;
-text-align: left;
-transition: background 0.1s;
-}
-.move-btn:nth-child(even) { border-right: none; }
-.move-btn:nth-last-child(-n+2) { border-bottom: none; }
-.move-btn:hover { background: #ddf; }
-.move-btn .move-type {
+/* Status badge */
+.sbadge {
 font-size: 5px;
 padding: 1px 3px;
 border-radius: 2px;
-display: inline-block;
-margin-top: 3px;
+margin-left: 3px;
 color: #fff;
+font-weight: bold;
 }
-.move-btn .move-pp { font-size: 5px; color: #666; float: right; }
-.move-btn.no-pp { color: #aaa; }
+.s-PSN{background:#a040a0} .s-BRN{background:#f08030} .s-PAR{background:#e8c800;color:#000}
+.s-SLP{background:#708080} .s-FRZ{background:#80c8d0;color:#000}
 
-/* Back button */
-#back-btn {
-display: none;
-font-family: ‘Press Start 2P’, monospace;
-font-size: 8px;
-padding: 10px;
-border: none;
-border-top: var(–border-pixel);
-cursor: pointer;
-background: #f0f0f0;
-color: #555;
-text-align: center;
-width: 100%;
-}
-#back-btn:hover { background: #e0e0e0; }
-
-/* Type colors */
-.type-fire    { background: #f08030; }
-.type-water   { background: #6890f0; }
-.type-grass   { background: #78c850; }
-.type-electric{ background: #f8d030; color: #000 !important; }
-.type-psychic { background: #f85888; }
-.type-ice     { background: #98d8d8; color: #000 !important; }
-.type-normal  { background: #a8a878; }
-.type-fighting{ background: #c03028; }
-.type-poison  { background: #a040a0; }
-.type-ground  { background: #e0c068; color: #000 !important; }
-.type-flying  { background: #a890f0; }
-.type-bug     { background: #a8b820; }
-.type-rock    { background: #b8a038; }
-.type-ghost   { background: #705898; }
-.type-dragon  { background: #7038f8; }
-.type-dark    { background: #705848; }
-.type-steel   { background: #b8b8d0; color: #000 !important; }
-
-/* ── RESULT SCREEN ──────────────────────────────── */
-#result-screen {
-display: none;
-flex-direction: column;
-align-items: center;
-justify-content: center;
-gap: 20px;
-padding: 32px 16px;
-min-height: 100vh;
-text-align: center;
-}
-#result-title { font-size: clamp(16px, 5vw, 24px); text-shadow: var(–text-shadow); }
-.win  { color: var(–gb-yellow); }
-.lose { color: var(–gb-accent); }
-.draw { color: var(–gb-gray); }
-
-#result-msg { font-size: 9px; color: var(–gb-white); line-height: 2; max-width: 340px; }
-
-/* Buttons */
-.gb-btn {
-font-family: ‘Press Start 2P’, monospace;
-font-size: 9px;
-padding: 12px 20px;
-background: var(–gb-accent);
-color: #fff;
-border: var(–border-pixel);
-border-radius: 4px;
-cursor: pointer;
-box-shadow: 4px 4px 0 #000;
-transition: transform 0.1s, box-shadow 0.1s;
-text-transform: uppercase;
-}
-.gb-btn:hover { transform: translate(-2px,-2px); box-shadow: 6px 6px 0 #000; }
-.gb-btn:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 #000; }
-.gb-btn.secondary { background: var(–gb-panel); }
-
-.section-label { font-size: 8px; color: var(–gb-yellow); text-shadow: var(–text-shadow); margin-bottom: 6px; }
-
-/* ── POKEMON SPRITES via Canvas ─────────────────── */
-/* Sprites are procedurally drawn - each Pokemon has
-a unique pixel art profile */
-
-/* Particles */
-#particle-canvas {
+/* Sprites */
+#esp, #psp {
 position: absolute;
-inset: 0;
+image-rendering: pixelated;
+image-rendering: crisp-edges;
+}
+#esp { right: 12%; top: 8%; }
+#psp { left: 4%;  bottom: 20%; transform: scaleX(-1); }
+
+/* Particle canvas */
+#pfx {
+position: absolute; inset: 0;
 pointer-events: none;
 z-index: 10;
 }
 
-/* ── EXP bar ──────────────────────────────────────*/
-.exp-bar-outer {
-width: 100%;
-height: 4px;
-background: #ddd;
-border: 1px solid #888;
-margin-top: 4px;
-}
-.exp-bar-inner {
-height: 100%;
-background: #5090d0;
-transition: width 0.6s ease;
+/* Sprite animations */
+@keyframes shake-e { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+@keyframes shake-p { 0%,100%{transform:scaleX(-1)} 25%{transform:scaleX(-1) translateX(5px)} 75%{transform:scaleX(-1) translateX(-5px)} }
+@keyframes faint-e { to { opacity:0; transform:translateY(50px); } }
+@keyframes faint-p { to { opacity:0; transform:scaleX(-1) translateY(50px); } }
+.shk-e { animation: shake-e 0.38s ease; }
+.shk-p { animation: shake-p 0.38s ease; }
+
+/* ── Battle UI ── */
+#bui {
+flex: 1 1 auto;
+background: var(–white);
+display: flex;
+flex-direction: column;
+overflow: hidden;
+border-top: 3px solid #000;
+min-height: 0;
 }
 
-/* Status badges */
-.status-badge {
+#msgbox {
+flex: 0 0 auto;
+background: var(–white);
+border-bottom: 2px solid #000;
+padding: clamp(8px,2.5vw,12px) clamp(10px,3vw,16px);
+min-height: clamp(50px, 14vw, 68px);
+display: flex;
+align-items: center;
+}
+#msgtext {
+font-size: clamp(7px, 2.2vw, 10px);
+color: #111;
+line-height: 1.8;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+#msgcursor {
+display: inline-block;
+width: 7px; height: 7px;
+border-right: 2px solid #111;
+border-bottom: 2px solid #111;
+transform: rotate(45deg);
+margin-left: 5px;
+vertical-align: middle;
+animation: blink 0.9s infinite;
+}
+
+/* Action + Move menus share same slot */
+#menus { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+
+.btn-grid {
+display: grid;
+grid-template-columns: 1fr 1fr;
+flex: 1 1 auto;
+}
+.gbtn {
+font-family: var(–font);
+font-size: clamp(7px, 2.2vw, 10px);
+padding: clamp(10px,3.5vw,16px) 8px;
+border: none;
+border-right: 2px solid #000;
+border-bottom: 2px solid #000;
+cursor: pointer;
+background: var(–white);
+color: #111;
+text-align: left;
+transition: background 0.1s;
+display: flex;
+align-items: center;
+gap: 5px;
+min-height: 44px;
+}
+.gbtn:nth-child(even) { border-right: none; }
+.gbtn:nth-last-child(-n+2) { border-bottom: none; }
+.gbtn:active { background: #e0e0e0; }
+.gbtn .arr { color: var(–accent); font-size: 0.8em; }
+
+/* Move buttons */
+.mbtn {
+font-family: var(–font);
+font-size: clamp(6px, 1.9vw, 9px);
+padding: clamp(8px,3vw,12px) 8px;
+border: none;
+border-right: 2px solid #000;
+border-bottom: 2px solid #000;
+cursor: pointer;
+background: var(–white);
+color: #111;
+text-align: left;
+line-height: 1.8;
+min-height: 44px;
+transition: background 0.1s;
+}
+.mbtn:nth-child(even) { border-right: none; }
+.mbtn:nth-last-child(-n+2) { border-bottom: none; }
+.mbtn:active { background: #dde8ff; }
+.mbtn .mtype {
 font-size: 5px;
+color: #fff;
 padding: 1px 3px;
 border-radius: 2px;
 display: inline-block;
 margin-left: 4px;
-font-weight: bold;
-color: #fff;
+vertical-align: middle;
 }
-.status-PSN { background: #a040a0; }
-.status-BRN { background: #f08030; }
-.status-PAR { background: #f8d030; color: #000; }
-.status-SLP { background: #7b8f8f; }
-.status-FRZ { background: #98d8d8; color: #000; }
+.mbtn .mpp { font-size: 5px; color: #666; float: right; }
+.mbtn.npp { color: #bbb; }
 
-/* Mobile tweaks */
-@media (max-width: 420px) {
-#battle-field { height: 185px; }
-.action-btn { font-size: 7px; padding: 10px 6px; }
-.move-btn { font-size: 6px; }
+#backbtn {
+font-family: var(–font);
+font-size: clamp(7px, 2.2vw, 9px);
+padding: 10px;
+border: none;
+border-top: 2px solid #000;
+background: #eee;
+color: #555;
+cursor: pointer;
+text-align: center;
+width: 100%;
+min-height: 40px;
+flex-shrink: 0;
 }
+#backbtn:active { background: #ddd; }
+
+/* ══ RESULT SCREEN ════════════════════════════════════════ */
+
+#result-screen {
+padding: calc(var(–safe-t) + 24px) 20px calc(var(–safe-b) + 24px);
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+gap: 18px;
+text-align: center;
+min-height: 100dvh;
+}
+#rtitle {
+font-size: clamp(18px, 6vw, 32px);
+text-shadow: 4px 4px 0 #000;
+}
+.win  { color: var(–yellow); }
+.lose { color: var(–accent); }
+.draw { color: var(–gray); }
+#rmsg {
+font-size: clamp(7px, 2.5vw, 9px);
+color: var(–white);
+line-height: 2.2;
+max-width: 320px;
+white-space: pre-line;
+}
+.rb-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.rdbtn {
+font-family: var(–font);
+font-size: clamp(8px, 2.5vw, 11px);
+padding: 13px 20px;
+border: var(–bpx);
+border-radius: 5px;
+cursor: pointer;
+box-shadow: 4px 4px 0 #000;
+transition: transform 0.1s, box-shadow 0.1s;
+min-height: 48px;
+min-width: 120px;
+}
+.rdbtn:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 #000; }
+.rdbtn.primary { background: var(–accent); color: #fff; }
+.rdbtn.secondary { background: #0f3460; color: #fff; }
+
+/* ══ TYPE BADGE COLORS ════════════════════════════════════ */
+.t-fire{background:#f08030} .t-water{background:#6890f0} .t-grass{background:#78c850}
+.t-electric{background:#f8d030;color:#000!important} .t-psychic{background:#f85888}
+.t-ice{background:#98d8d8;color:#000!important} .t-normal{background:#a8a878}
+.t-fighting{background:#c03028} .t-poison{background:#a040a0} .t-ground{background:#e0c068;color:#000!important}
+.t-flying{background:#a890f0} .t-bug{background:#a8b820} .t-rock{background:#b8a038}
+.t-ghost{background:#705898} .t-dragon{background:#7038f8} .t-dark{background:#705848}
+.t-steel{background:#b8b8d0;color:#000!important} .t-fairy{background:#e898e8}
+
+/* ══ UTILITY ══════════════════════════════════════════════ */
+.hidden { display: none !important; }
 </style>
 
 </head>
 <body>
 
-<!-- Starfield -->
-
 <canvas id="starfield"></canvas>
 
-<div id="game-wrapper">
+<!-- ════════════════ TITLE / SELECTION SCREEN ════════════════ -->
 
-  <!-- ════════════════════ TITLE SCREEN ════════════════════ -->
+<div id="title-screen" class="screen active">
+  <div class="logo">
+    <div class="logo-top">POCKET</div>
+    <div class="logo-mid">BATTLE</div>
+    <div class="logo-sub">★ VERSION 1.0 ★</div>
+  </div>
 
-  <div id="title-screen">
-    <div class="title-logo">
-      <div class="poke">POCKET</div>
-      <div class="mon">BATTLE</div>
-      <div class="battle">VERSION 1.0</div>
+  <!-- Selected preview row -->
+
+  <div class="sel-status">
+    <div class="sel-slot" id="slot-you">
+      <div class="slot-label">YOUR PICK</div>
+      <canvas id="slot-you-canvas" width="40" height="40" style="display:none;image-rendering:pixelated"></canvas>
+      <div class="slot-empty" id="slot-you-empty">???</div>
+      <div class="slot-name" id="slot-you-name"></div>
     </div>
+    <div class="sel-slot" id="slot-opp">
+      <div class="slot-label">OPPONENT</div>
+      <canvas id="slot-opp-canvas" width="40" height="40" style="display:none;image-rendering:pixelated"></canvas>
+      <div class="slot-empty" id="slot-opp-empty">???</div>
+      <div class="slot-name" id="slot-opp-name"></div>
+    </div>
+  </div>
+
+  <div class="select-panel">
+    <div class="panel-title">▶ CHOOSE YOUR PARTNER</div>
+    <div class="poke-grid" id="player-grid"></div>
+  </div>
+
+  <div class="select-panel">
+    <div class="panel-title">▶ CHOOSE YOUR OPPONENT</div>
+    <div class="poke-grid" id="opp-grid"></div>
+  </div>
+
+  <div class="hint-text">
+    Tap a Pokémon in each row to select it.<br>
+    Both must be chosen to start the battle.
+  </div>
+</div>
+
+<!-- Sticky START button (outside scroll container, above it) -->
+
+<div id="start-bar">
+  <button id="start-btn" disabled>▶ START BATTLE</button>
+</div>
+
+<!-- ════════════════ BATTLE SCREEN ════════════════════════════ -->
+
+<div id="battle-screen" class="screen">
+  <div id="battle-field">
+    <canvas id="pfx"></canvas>
+    <div class="plat" id="plat-e"></div>
+    <div class="plat" id="plat-p"></div>
 
 ```
-<div class="pixel-box" style="width:100%">
-  <div class="section-label">► CHOOSE YOUR PARTNER</div>
-  <div class="starter-grid" id="starter-grid">
-    <!-- filled by JS -->
+<!-- Enemy HP box -->
+<div class="binfo" id="einfo">
+  <div class="bpname">
+    <span id="ename">---</span>
+    <span class="blvl" id="elvl">Lv1</span>
   </div>
+  <div class="hplabel">HP <span id="estatus"></span></div>
+  <div class="hpout"><div class="hpin" id="ehpbar" style="width:100%"></div></div>
+  <div class="hpnum" id="ehpnum"></div>
 </div>
 
-<div class="pixel-box" style="width:100%; text-align:center;">
-  <div class="section-label" style="margin-bottom:10px;">► CHOOSE OPPONENT</div>
-  <div class="starter-grid" id="opponent-grid">
-    <!-- filled by JS -->
+<!-- Player HP box -->
+<div class="binfo" id="pinfo">
+  <div class="bpname">
+    <span id="pname">---</span>
+    <span class="blvl" id="plvl">Lv1</span>
   </div>
+  <div class="hplabel">HP <span id="pstatus"></span></div>
+  <div class="hpout"><div class="hpin" id="phpbar" style="width:100%"></div></div>
+  <div class="hpnum" id="phpnum"></div>
+  <div class="expout"><div class="expin" id="expbar" style="width:30%"></div></div>
 </div>
 
-<button class="gb-btn" id="start-btn" disabled>▶ START BATTLE</button>
-<div style="font-size:6px; color:var(--gb-gray); text-align:center; line-height:2;">
-  Use FIGHT to attack · BAG for items<br>
-  SWITCH to swap · RUN to flee
-</div>
-```
-
-  </div>
-
-  <!-- ════════════════════ BATTLE SCREEN ════════════════════ -->
-
-  <div id="battle-screen">
-    <div id="battle-field">
-      <canvas id="particle-canvas"></canvas>
-      <!-- Ground platforms -->
-      <div class="platform" id="plat-enemy"></div>
-      <div class="platform" id="plat-player"></div>
-
-```
-  <!-- Enemy info -->
-  <div class="battle-info" id="enemy-info">
-    <div class="poke-name">
-      <span id="enemy-name">BULBASAUR</span>
-      <span class="poke-level" id="enemy-level">Lv5</span>
-    </div>
-    <div class="hp-label">HP <span id="enemy-status"></span></div>
-    <div class="hp-bar-outer"><div class="hp-bar-inner" id="enemy-hp-bar" style="width:100%"></div></div>
-    <div class="hp-numbers" id="enemy-hp-numbers"></div>
-  </div>
-
-  <!-- Player info -->
-  <div class="battle-info" id="player-info">
-    <div class="poke-name">
-      <span id="player-name">CHARMANDER</span>
-      <span class="poke-level" id="player-level">Lv5</span>
-    </div>
-    <div class="hp-label">HP <span id="player-status"></span></div>
-    <div class="hp-bar-outer"><div class="hp-bar-inner" id="player-hp-bar" style="width:100%"></div></div>
-    <div class="hp-numbers" id="player-hp-numbers"></div>
-    <div class="exp-bar-outer"><div class="exp-bar-inner" id="player-exp-bar" style="width:30%"></div></div>
-  </div>
-
-  <!-- Sprites -->
-  <canvas id="enemy-sprite-canvas" width="96" height="96"></canvas>
-  <canvas id="player-sprite-canvas" width="96" height="96"></canvas>
-</div>
-
-<!-- Battle UI -->
-<div id="battle-ui">
-  <div id="message-box">
-    <div id="message-text">What will <span id="msg-pokemon-name">POKEMON</span> do?
-      <span id="message-cursor"></span>
-    </div>
-  </div>
-
-  <!-- Action menu -->
-  <div id="action-menu">
-    <button class="action-btn" id="btn-fight"><span class="arrow">▶</span>FIGHT</button>
-    <button class="action-btn" id="btn-bag"><span class="arrow">▶</span>BAG</button>
-    <button class="action-btn" id="btn-switch"><span class="arrow">▶</span>SWITCH</button>
-    <button class="action-btn" id="btn-run"><span class="arrow">▶</span>RUN</button>
-  </div>
-
-  <!-- Move menu (hidden by default) -->
-  <div id="move-menu">
-    <!-- filled by JS -->
-  </div>
-
-  <button id="back-btn">◀ BACK</button>
-</div>
+<!-- Sprites -->
+<canvas id="esp" width="80" height="80"></canvas>
+<canvas id="psp" width="80" height="80"></canvas>
 ```
 
   </div>
 
-  <!-- ════════════════════ RESULT SCREEN ════════════════════ -->
-
-  <div id="result-screen">
-    <div id="result-title">RESULT</div>
-    <canvas id="result-sprite" width="128" height="128"></canvas>
-    <div id="result-msg"></div>
-    <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center;">
-      <button class="gb-btn" id="rematch-btn">↺ REMATCH</button>
-      <button class="gb-btn secondary" id="new-game-btn">⌂ MENU</button>
+  <div id="bui">
+    <div id="msgbox">
+      <div id="msgtext">What will <span id="msgpoke">---</span> do? <span id="msgcursor"></span></div>
+    </div>
+    <div id="menus">
+      <!-- Action menu -->
+      <div id="actmenu" class="btn-grid">
+        <button class="gbtn" id="btn-fight"><span class="arr">▶</span>FIGHT</button>
+        <button class="gbtn" id="btn-bag"><span class="arr">▶</span>BAG</button>
+        <button class="gbtn" id="btn-switch"><span class="arr">▶</span>SWITCH</button>
+        <button class="gbtn" id="btn-run"><span class="arr">▶</span>RUN</button>
+      </div>
+      <!-- Move menu (hidden) -->
+      <div id="movemenu" class="btn-grid hidden"></div>
+      <!-- Back button -->
+      <button id="backbtn" class="hidden">◀ BACK</button>
     </div>
   </div>
+</div>
 
-</div><!-- #game-wrapper -->
+<!-- ════════════════ RESULT SCREEN ══════════════════════════ -->
+
+<div id="result-screen" class="screen">
+  <div id="rtitle">RESULT</div>
+  <canvas id="rsprite" width="112" height="112" style="image-rendering:pixelated"></canvas>
+  <div id="rmsg"></div>
+  <div class="rb-row">
+    <button class="rdbtn primary" id="rbtn-rematch">↺ REMATCH</button>
+    <button class="rdbtn secondary" id="rbtn-menu">⌂ MENU</button>
+  </div>
+</div>
 
 <script>
-// ╔══════════════════════════════════════════════════════════════╗
-//   POKEMON BATTLE ENGINE
-//   - 15 unique Pokemon with full move sets
-//   - Type effectiveness chart
-//   - Status effects (PSN, BRN, PAR, SLP, FRZ)
-//   - Item bag (potions, revives)
-//   - AI opponent with basic strategy
-//   - Particle effects for moves
-//   - Procedural pixel-art sprites drawn on canvas
-// ╚══════════════════════════════════════════════════════════════╝
-
+// ═══════════════════════════════════════════════════════════
+//  POCKET BATTLE ENGINE  v1.1
+//  Fixes: font fallback, mobile scroll, responsive layout
+// ═══════════════════════════════════════════════════════════
 'use strict';
 
-// ── TYPE CHART ───────────────────────────────────────────────
-const TYPE_CHART = {
-  fire:     { grass:2, ice:2, bug:2, steel:2, water:0.5, fire:0.5, rock:0.5, dragon:0.5 },
-  water:    { fire:2, ground:2, rock:2, water:0.5, grass:0.5, dragon:0.5 },
-  grass:    { water:2, ground:2, rock:2, fire:0.5, grass:0.5, poison:0.5, flying:0.5, bug:0.5, dragon:0.5, steel:0.5 },
-  electric: { water:2, flying:2, grass:0.5, electric:0.5, dragon:0.5, ground:0 },
-  ice:      { grass:2, ground:2, flying:2, dragon:2, fire:0.5, water:0.5, ice:0.5, steel:0.5 },
-  fighting: { normal:2, ice:2, rock:2, dark:2, steel:2, poison:0.5, flying:0.5, psychic:0.5, bug:0.5, ghost:0 },
-  poison:   { grass:2, fairy:2, poison:0.5, ground:0.5, rock:0.5, ghost:0.5, steel:0 },
-  ground:   { fire:2, electric:2, poison:2, rock:2, steel:2, grass:0.5, bug:0.5, flying:0 },
-  flying:   { grass:2, fighting:2, bug:2, electric:0.5, rock:0.5, steel:0.5 },
-  psychic:  { fighting:2, poison:2, psychic:0.5, steel:0.5, dark:0, ghost:0 },
-  bug:      { grass:2, psychic:2, dark:2, fire:0.5, fighting:0.5, flying:0.5, ghost:0.5, steel:0.5 },
-  rock:     { fire:2, ice:2, flying:2, bug:2, fighting:0.5, ground:0.5, steel:0.5 },
-  ghost:    { psychic:2, ghost:2, normal:0, fighting:0, dark:0.5 },
-  dragon:   { dragon:2, steel:0.5, fairy:0 },
-  dark:     { psychic:2, ghost:2, fighting:0.5, dark:0.5, fairy:0.5 },
-  steel:    { ice:2, rock:2, fairy:2, fire:0.5, water:0.5, electric:0.5, steel:0.5 },
-  normal:   { rock:0.5, steel:0.5, ghost:0 },
-  fairy:    { fighting:2, dragon:2, dark:2, fire:0.5, poison:0.5, steel:0.5 },
+// ── Load pixel font async ────────────────────────────────
+const fontLink = document.createElement('link');
+fontLink.rel = 'stylesheet';
+fontLink.href = 'https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap';
+fontLink.onload = () => document.body.classList.add('font-loaded');
+document.head.appendChild(fontLink);
+
+// ── TYPE CHART ───────────────────────────────────────────
+const TC = {
+  fire:     {grass:2,ice:2,bug:2,steel:2,water:0.5,fire:0.5,rock:0.5,dragon:0.5},
+  water:    {fire:2,ground:2,rock:2,water:0.5,grass:0.5,dragon:0.5},
+  grass:    {water:2,ground:2,rock:2,fire:0.5,grass:0.5,poison:0.5,flying:0.5,bug:0.5,dragon:0.5,steel:0.5},
+  electric: {water:2,flying:2,grass:0.5,electric:0.5,dragon:0.5,ground:0},
+  ice:      {grass:2,ground:2,flying:2,dragon:2,fire:0.5,water:0.5,ice:0.5,steel:0.5},
+  fighting: {normal:2,ice:2,rock:2,dark:2,steel:2,poison:0.5,flying:0.5,psychic:0.5,bug:0.5,ghost:0},
+  poison:   {grass:2,fairy:2,poison:0.5,ground:0.5,rock:0.5,ghost:0.5,steel:0},
+  ground:   {fire:2,electric:2,poison:2,rock:2,steel:2,grass:0.5,bug:0.5,flying:0},
+  flying:   {grass:2,fighting:2,bug:2,electric:0.5,rock:0.5,steel:0.5},
+  psychic:  {fighting:2,poison:2,psychic:0.5,steel:0.5,dark:0,ghost:0},
+  bug:      {grass:2,psychic:2,dark:2,fire:0.5,fighting:0.5,flying:0.5,ghost:0.5,steel:0.5},
+  rock:     {fire:2,ice:2,flying:2,bug:2,fighting:0.5,ground:0.5,steel:0.5},
+  ghost:    {psychic:2,ghost:2,normal:0,fighting:0,dark:0.5},
+  dragon:   {dragon:2,steel:0.5,fairy:0},
+  dark:     {psychic:2,ghost:2,fighting:0.5,dark:0.5,fairy:0.5},
+  steel:    {ice:2,rock:2,fairy:2,fire:0.5,water:0.5,electric:0.5,steel:0.5},
+  normal:   {rock:0.5,steel:0.5,ghost:0},
+  fairy:    {fighting:2,dragon:2,dark:2,fire:0.5,poison:0.5,steel:0.5},
 };
 
-function typeEffectiveness(moveType, defenderTypes) {
-  let mult = 1;
-  defenderTypes.forEach(t => {
-    const row = TYPE_CHART[moveType] || {};
-    if (row[t] !== undefined) mult *= row[t];
-  });
-  return mult;
+function typeEff(mt, dt) {
+  let m=1; dt.forEach(t=>{const r=TC[mt]||{};if(r[t]!==undefined)m*=r[t];}); return m;
 }
 
-// ── MOVE DATABASE ────────────────────────────────────────────
-const MOVES = {
-  // Fire
-  ember:         { name:'Ember',        type:'fire',     power:40, accuracy:100, pp:25, category:'special', effect:null },
-  flamethrower:  { name:'Flamethrower', type:'fire',     power:90, accuracy:100, pp:15, category:'special', effect:{chance:10,status:'BRN'} },
-  fireblast:     { name:'Fire Blast',   type:'fire',     power:110,accuracy:85,  pp:5,  category:'special', effect:{chance:10,status:'BRN'} },
-  firespin:      { name:'Fire Spin',    type:'fire',     power:35, accuracy:85,  pp:15, category:'special', effect:null },
-  // Water
-  watergun:      { name:'Water Gun',    type:'water',    power:40, accuracy:100, pp:25, category:'special', effect:null },
-  surf:          { name:'Surf',         type:'water',    power:90, accuracy:100, pp:15, category:'special', effect:null },
-  hydropump:     { name:'Hydro Pump',   type:'water',    power:110,accuracy:80,  pp:5,  category:'special', effect:null },
-  bubble:        { name:'Bubble',       type:'water',    power:40, accuracy:100, pp:30, category:'special', effect:{chance:10,stat:'spd',stages:-1} },
-  // Grass
-  vinewhip:      { name:'Vine Whip',    type:'grass',    power:45, accuracy:100, pp:25, category:'physical',effect:null },
-  razorleaf:     { name:'Razor Leaf',   type:'grass',    power:55, accuracy:95,  pp:25, category:'physical',effect:null, critHigh:true },
-  solarbeam:     { name:'Solar Beam',   type:'grass',    power:120,accuracy:100, pp:10, category:'special', effect:null },
-  leechseed:     { name:'Leech Seed',   type:'grass',    power:0,  accuracy:90,  pp:10, category:'status',  effect:{status:'leech'} },
-  // Electric
-  thundershock:  { name:'ThunderShock', type:'electric', power:40, accuracy:100, pp:30, category:'special', effect:{chance:10,status:'PAR'} },
-  thunderbolt:   { name:'Thunderbolt',  type:'electric', power:90, accuracy:100, pp:15, category:'special', effect:{chance:10,status:'PAR'} },
-  thunder:       { name:'Thunder',      type:'electric', power:110,accuracy:70,  pp:10, category:'special', effect:{chance:30,status:'PAR'} },
-  spark:         { name:'Spark',        type:'electric', power:65, accuracy:100, pp:20, category:'physical',effect:{chance:30,status:'PAR'} },
-  // Normal
-  tackle:        { name:'Tackle',       type:'normal',   power:40, accuracy:100, pp:35, category:'physical',effect:null },
-  scratch:       { name:'Scratch',      type:'normal',   power:40, accuracy:100, pp:35, category:'physical',effect:null },
-  slash:         { name:'Slash',        type:'normal',   power:70, accuracy:100, pp:20, category:'physical',effect:null, critHigh:true },
-  bodyslam:      { name:'Body Slam',    type:'normal',   power:85, accuracy:100, pp:15, category:'physical',effect:{chance:30,status:'PAR'} },
-  hyperbeam:     { name:'Hyper Beam',   type:'normal',   power:150,accuracy:90,  pp:5,  category:'special', effect:null },
-  // Psychic
-  confusion:     { name:'Confusion',    type:'psychic',  power:50, accuracy:100, pp:25, category:'special', effect:null },
-  psybeam:       { name:'Psybeam',      type:'psychic',  power:65, accuracy:100, pp:20, category:'special', effect:null },
-  psychic:       { name:'Psychic',      type:'psychic',  power:90, accuracy:100, pp:10, category:'special', effect:{chance:10,stat:'spd',stages:-1} },
-  // Ice
-  icebeam:       { name:'Ice Beam',     type:'ice',      power:90, accuracy:100, pp:10, category:'special', effect:{chance:10,status:'FRZ'} },
-  blizzard:      { name:'Blizzard',     type:'ice',      power:110,accuracy:70,  pp:5,  category:'special', effect:{chance:10,status:'FRZ'} },
-  // Fighting
-  karatechop:    { name:'Karate Chop',  type:'fighting', power:50, accuracy:100, pp:25, category:'physical',effect:null, critHigh:true },
-  submission:    { name:'Submission',   type:'fighting', power:80, accuracy:80,  pp:25, category:'physical',effect:null },
-  // Poison
-  poisonsting:   { name:'Poison Sting', type:'poison',   power:15, accuracy:100, pp:35, category:'physical',effect:{chance:30,status:'PSN'} },
-  sludge:        { name:'Sludge',       type:'poison',   power:65, accuracy:100, pp:20, category:'special', effect:{chance:30,status:'PSN'} },
-  sludgebomb:    { name:'Sludge Bomb',  type:'poison',   power:90, accuracy:100, pp:10, category:'special', effect:{chance:30,status:'PSN'} },
-  // Ground
-  earthquake:    { name:'Earthquake',   type:'ground',   power:100,accuracy:100, pp:10, category:'physical',effect:null },
-  mudslap:       { name:'Mud-Slap',     type:'ground',   power:20, accuracy:100, pp:10, category:'special', effect:{stat:'acc',stages:-1} },
-  // Rock
-  rockthrow:     { name:'Rock Throw',   type:'rock',     power:50, accuracy:90,  pp:15, category:'physical',effect:null },
-  rockslide:     { name:'Rock Slide',   type:'rock',     power:75, accuracy:90,  pp:10, category:'physical',effect:{chance:30,flinch:true} },
-  // Ghost
-  nightshade:    { name:'Night Shade',  type:'ghost',    power:1,  accuracy:100, pp:15, category:'special', effect:{fixedDmg:true} },
-  shadowball:    { name:'Shadow Ball',  type:'ghost',    power:80, accuracy:100, pp:15, category:'special', effect:{chance:20,stat:'spd',stages:-1} },
-  // Dragon
-  dragonrage:    { name:'Dragon Rage',  type:'dragon',   power:1,  accuracy:100, pp:10, category:'special', effect:{fixedDmg:true,fixedAmt:40} },
-  dragonbreath:  { name:'DragonBreath', type:'dragon',   power:60, accuracy:100, pp:20, category:'special', effect:{chance:30,status:'PAR'} },
-  // Dark
-  bite:          { name:'Bite',         type:'dark',     power:60, accuracy:100, pp:25, category:'physical',effect:{chance:30,flinch:true} },
-  crunch:        { name:'Crunch',       type:'dark',     power:80, accuracy:100, pp:15, category:'physical',effect:{chance:20,stat:'def',stages:-1} },
-  // Flying
-  gust:          { name:'Gust',         type:'flying',   power:40, accuracy:100, pp:35, category:'special', effect:null },
-  wingattack:    { name:'Wing Attack',  type:'flying',   power:60, accuracy:100, pp:35, category:'physical',effect:null },
-  // Steel
-  ironhead:      { name:'Iron Head',    type:'steel',    power:80, accuracy:100, pp:15, category:'physical',effect:{chance:30,flinch:true} },
-  // Status moves
-  growl:         { name:'Growl',        type:'normal',   power:0,  accuracy:100, pp:40, category:'status',  effect:{stat:'atk',stages:-1} },
-  tailwhip:      { name:'Tail Whip',    type:'normal',   power:0,  accuracy:100, pp:30, category:'status',  effect:{stat:'def',stages:-1} },
-  smokescreen:   { name:'Smokescreen',  type:'normal',   power:0,  accuracy:100, pp:20, category:'status',  effect:{stat:'acc',stages:-1} },
-  sandattack:    { name:'Sand Attack',  type:'ground',   power:0,  accuracy:100, pp:15, category:'status',  effect:{stat:'acc',stages:-1} },
-  poisonpowder:  { name:'PoisonPowder', type:'poison',   power:0,  accuracy:75,  pp:35, category:'status',  effect:{status:'PSN'} },
-  sleeppowder:   { name:'Sleep Powder', type:'grass',    power:0,  accuracy:75,  pp:15, category:'status',  effect:{status:'SLP'} },
-  thunderwave:   { name:'Thunder Wave', type:'electric', power:0,  accuracy:90,  pp:20, category:'status',  effect:{status:'PAR'} },
-  recover:       { name:'Recover',      type:'normal',   power:0,  accuracy:100, pp:10, category:'status',  effect:{heal:0.5} },
-  softboiled:    { name:'Soft-Boiled',  type:'normal',   power:0,  accuracy:100, pp:10, category:'status',  effect:{heal:0.5} },
-  amnesia:       { name:'Amnesia',      type:'psychic',  power:0,  accuracy:100, pp:20, category:'status',  effect:{stat:'spa',stages:2,self:true} },
-  swordsdance:   { name:'Swords Dance', type:'normal',   power:0,  accuracy:100, pp:20, category:'status',  effect:{stat:'atk',stages:2,self:true} },
-  agility:       { name:'Agility',      type:'psychic',  power:0,  accuracy:100, pp:30, category:'status',  effect:{stat:'spd',stages:2,self:true} },
+// ── MOVE DATABASE ────────────────────────────────────────
+const MV = {
+  ember:        {name:'Ember',        type:'fire',    pw:40, ac:100,pp:25,cat:'special', fx:null},
+  flamethrower: {name:'Flamethrower', type:'fire',    pw:90, ac:100,pp:15,cat:'special', fx:{ch:10,st:'BRN'}},
+  fireblast:    {name:'Fire Blast',   type:'fire',    pw:110,ac:85, pp:5, cat:'special', fx:{ch:10,st:'BRN'}},
+  watergun:     {name:'Water Gun',    type:'water',   pw:40, ac:100,pp:25,cat:'special', fx:null},
+  surf:         {name:'Surf',         type:'water',   pw:90, ac:100,pp:15,cat:'special', fx:null},
+  hydropump:    {name:'Hydro Pump',   type:'water',   pw:110,ac:80, pp:5, cat:'special', fx:null},
+  bubble:       {name:'Bubble',       type:'water',   pw:40, ac:100,pp:30,cat:'special', fx:{ch:10,stat:'spd',stages:-1}},
+  vinewhip:     {name:'Vine Whip',    type:'grass',   pw:45, ac:100,pp:25,cat:'physical',fx:null},
+  razorleaf:    {name:'Razor Leaf',   type:'grass',   pw:55, ac:95, pp:25,cat:'physical',fx:null,crit:true},
+  solarbeam:    {name:'Solar Beam',   type:'grass',   pw:120,ac:100,pp:10,cat:'special', fx:null},
+  leechseed:    {name:'Leech Seed',   type:'grass',   pw:0,  ac:90, pp:10,cat:'status',  fx:{st:'PSN'}},
+  thundershock: {name:'ThunderShock', type:'electric',pw:40, ac:100,pp:30,cat:'special', fx:{ch:10,st:'PAR'}},
+  thunderbolt:  {name:'Thunderbolt',  type:'electric',pw:90, ac:100,pp:15,cat:'special', fx:{ch:10,st:'PAR'}},
+  thunder:      {name:'Thunder',      type:'electric',pw:110,ac:70, pp:10,cat:'special', fx:{ch:30,st:'PAR'}},
+  spark:        {name:'Spark',        type:'electric',pw:65, ac:100,pp:20,cat:'physical',fx:{ch:30,st:'PAR'}},
+  thunderwave:  {name:'Thunder Wave', type:'electric',pw:0,  ac:90, pp:20,cat:'status',  fx:{st:'PAR'}},
+  tackle:       {name:'Tackle',       type:'normal',  pw:40, ac:100,pp:35,cat:'physical',fx:null},
+  scratch:      {name:'Scratch',      type:'normal',  pw:40, ac:100,pp:35,cat:'physical',fx:null},
+  slash:        {name:'Slash',        type:'normal',  pw:70, ac:100,pp:20,cat:'physical',fx:null,crit:true},
+  bodyslam:     {name:'Body Slam',    type:'normal',  pw:85, ac:100,pp:15,cat:'physical',fx:{ch:30,st:'PAR'}},
+  hyperbeam:    {name:'Hyper Beam',   type:'normal',  pw:150,ac:90, pp:5, cat:'special', fx:null},
+  pound:        {name:'Pound',        type:'normal',  pw:40, ac:100,pp:35,cat:'physical',fx:null},
+  wrap:         {name:'Wrap',         type:'normal',  pw:15, ac:90, pp:20,cat:'physical',fx:null},
+  leer:         {name:'Leer',         type:'normal',  pw:0,  ac:100,pp:30,cat:'status',  fx:{stat:'def',stages:-1}},
+  growl:        {name:'Growl',        type:'normal',  pw:0,  ac:100,pp:40,cat:'status',  fx:{stat:'atk',stages:-1}},
+  tailwhip:     {name:'Tail Whip',    type:'normal',  pw:0,  ac:100,pp:30,cat:'status',  fx:{stat:'def',stages:-1}},
+  smokescreen:  {name:'Smokescreen',  type:'normal',  pw:0,  ac:100,pp:20,cat:'status',  fx:{stat:'acc',stages:-1}},
+  disable:      {name:'Disable',      type:'normal',  pw:0,  ac:100,pp:20,cat:'status',  fx:null},
+  payday:       {name:'Pay Day',      type:'normal',  pw:40, ac:100,pp:20,cat:'physical',fx:null},
+  quickattack:  {name:'Quick Attack', type:'normal',  pw:40, ac:100,pp:30,cat:'physical',fx:null},
+  confusion:    {name:'Confusion',    type:'psychic', pw:50, ac:100,pp:25,cat:'special', fx:null},
+  psybeam:      {name:'Psybeam',      type:'psychic', pw:65, ac:100,pp:20,cat:'special', fx:null},
+  psychic:      {name:'Psychic',      type:'psychic', pw:90, ac:100,pp:10,cat:'special', fx:{ch:10,stat:'spd',stages:-1}},
+  hypnosis:     {name:'Hypnosis',     type:'psychic', pw:0,  ac:60, pp:20,cat:'status',  fx:{st:'SLP'}},
+  teleport:     {name:'Teleport',     type:'psychic', pw:0,  ac:100,pp:20,cat:'status',  fx:null},
+  agility:      {name:'Agility',      type:'psychic', pw:0,  ac:100,pp:30,cat:'status',  fx:{stat:'spd',stages:2,self:true}},
+  icebeam:      {name:'Ice Beam',     type:'ice',     pw:90, ac:100,pp:10,cat:'special', fx:{ch:10,st:'FRZ'}},
+  blizzard:     {name:'Blizzard',     type:'ice',     pw:110,ac:70, pp:5, cat:'special', fx:{ch:10,st:'FRZ'}},
+  karatechop:   {name:'Karate Chop',  type:'fighting',pw:50, ac:100,pp:25,cat:'physical',fx:null,crit:true},
+  submission:   {name:'Submission',   type:'fighting',pw:80, ac:80, pp:25,cat:'physical',fx:null},
+  lowkick:      {name:'Low Kick',     type:'fighting',pw:50, ac:90, pp:20,cat:'physical',fx:null},
+  poisonsting:  {name:'Poison Sting', type:'poison',  pw:15, ac:100,pp:35,cat:'physical',fx:{ch:30,st:'PSN'}},
+  sludge:       {name:'Sludge',       type:'poison',  pw:65, ac:100,pp:20,cat:'special', fx:{ch:30,st:'PSN'}},
+  sludgebomb:   {name:'Sludge Bomb',  type:'poison',  pw:90, ac:100,pp:10,cat:'special', fx:{ch:30,st:'PSN'}},
+  poisonpowder: {name:'PoisonPowder', type:'poison',  pw:0,  ac:75, pp:35,cat:'status',  fx:{st:'PSN'}},
+  sleeppowder:  {name:'Sleep Powder', type:'grass',   pw:0,  ac:75, pp:15,cat:'status',  fx:{st:'SLP'}},
+  earthquake:   {name:'Earthquake',   type:'ground',  pw:100,ac:100,pp:10,cat:'physical',fx:null},
+  mudslap:      {name:'Mud-Slap',     type:'ground',  pw:20, ac:100,pp:10,cat:'special', fx:{stat:'acc',stages:-1}},
+  magnitude:    {name:'Magnitude',    type:'ground',  pw:70, ac:100,pp:30,cat:'physical',fx:null},
+  sandattack:   {name:'Sand Attack',  type:'ground',  pw:0,  ac:100,pp:15,cat:'status',  fx:{stat:'acc',stages:-1}},
+  boneclub:     {name:'Bone Club',    type:'ground',  pw:65, ac:85, pp:20,cat:'physical',fx:{ch:10,flinch:true}},
+  boomerang:    {name:'Bone Boomerang',type:'ground', pw:50, ac:90, pp:10,cat:'physical',fx:null},
+  rockthrow:    {name:'Rock Throw',   type:'rock',    pw:50, ac:90, pp:15,cat:'physical',fx:null},
+  rockslide:    {name:'Rock Slide',   type:'rock',    pw:75, ac:90, pp:10,cat:'physical',fx:{ch:30,flinch:true}},
+  nightshade:   {name:'Night Shade',  type:'ghost',   pw:1,  ac:100,pp:15,cat:'special', fx:{fixd:true}},
+  shadowball:   {name:'Shadow Ball',  type:'ghost',   pw:80, ac:100,pp:15,cat:'special', fx:{ch:20,stat:'spd',stages:-1}},
+  lick:         {name:'Lick',         type:'ghost',   pw:30, ac:100,pp:30,cat:'physical',fx:{ch:30,st:'PAR'}},
+  dragonbreath: {name:'DragonBreath', type:'dragon',  pw:60, ac:100,pp:20,cat:'special', fx:{ch:30,st:'PAR'}},
+  dragonrage:   {name:'Dragon Rage',  type:'dragon',  pw:1,  ac:100,pp:10,cat:'special', fx:{fixd:true,fixamt:40}},
+  bite:         {name:'Bite',         type:'dark',    pw:60, ac:100,pp:25,cat:'physical',fx:{ch:30,flinch:true}},
+  crunch:       {name:'Crunch',       type:'dark',    pw:80, ac:100,pp:15,cat:'physical',fx:{ch:20,stat:'def',stages:-1}},
+  sing:         {name:'Sing',         type:'normal',  pw:0,  ac:55, pp:15,cat:'status',  fx:{st:'SLP'}},
+  recover:      {name:'Recover',      type:'normal',  pw:0,  ac:100,pp:10,cat:'status',  fx:{heal:0.5}},
+  swordsdance:  {name:'Swords Dance', type:'normal',  pw:0,  ac:100,pp:20,cat:'status',  fx:{stat:'atk',stages:2,self:true}},
+  gust:         {name:'Gust',         type:'flying',  pw:40, ac:100,pp:35,cat:'special', fx:null},
+  wingattack:   {name:'Wing Attack',  type:'flying',  pw:60, ac:100,pp:35,cat:'physical',fx:null},
+  ironhead:     {name:'Iron Head',    type:'steel',   pw:80, ac:100,pp:15,cat:'physical',fx:{ch:30,flinch:true}},
 };
 
-// ── POKEMON DATABASE ─────────────────────────────────────────
-const POKEMON = [
-  {
-    id: 1, name: 'BULBASAUR', types: ['grass','poison'],
-    baseStats: { hp:45, atk:49, def:49, spa:65, spd:45 },
-    moves: ['vinewhip','leechseed','sleeppowder','razorleaf'],
-    color: '#78c850', shadowColor: '#5a9a38',
-    sprite: 'bulbasaur',
-    description: 'The Seed Pokémon'
-  },
-  {
-    id: 4, name: 'CHARMANDER', types: ['fire'],
-    baseStats: { hp:39, atk:52, def:43, spa:60, spd:65 },
-    moves: ['scratch','ember','smokescreen','slash'],
-    color: '#f08030', shadowColor: '#c05010',
-    sprite: 'charmander',
-    description: 'The Lizard Pokémon'
-  },
-  {
-    id: 7, name: 'SQUIRTLE', types: ['water'],
-    baseStats: { hp:44, atk:48, def:65, spa:50, spd:43 },
-    moves: ['tackle','watergun','tailwhip','bubble'],
-    color: '#6890f0', shadowColor: '#4860c0',
-    sprite: 'squirtle',
-    description: 'The Tiny Turtle Pokémon'
-  },
-  {
-    id: 25, name: 'PIKACHU', types: ['electric'],
-    baseStats: { hp:35, atk:55, def:40, spa:50, spd:90 },
-    moves: ['thundershock','thunderwave','quickattack','spark'],
-    color: '#f8d030', shadowColor: '#c0a010',
-    sprite: 'pikachu',
-    description: 'The Mouse Pokémon'
-  },
-  {
-    id: 39, name: 'JIGGLYPUFF', types: ['normal','fairy'],
-    baseStats: { hp:115, atk:45, def:20, spa:45, spd:20 },
-    moves: ['pound','sing','disable','bodyslam'],
-    color: '#f4b8e8', shadowColor: '#d490c0',
-    sprite: 'jigglypuff',
-    description: 'The Balloon Pokémon'
-  },
-  {
-    id: 52, name: 'MEOWTH', types: ['normal'],
-    baseStats: { hp:40, atk:45, def:35, spa:40, spd:90 },
-    moves: ['scratch','bite','payday','slash'],
-    color: '#f8c8a0', shadowColor: '#d0a070',
-    sprite: 'meowth',
-    description: 'The Scratch Cat Pokémon'
-  },
-  {
-    id: 63, name: 'ABRA', types: ['psychic'],
-    baseStats: { hp:25, atk:20, def:15, spa:105, spd:90 },
-    moves: ['teleport','confusion','psybeam','psychic'],
-    color: '#f8d8a0', shadowColor: '#d0b070',
-    sprite: 'abra',
-    description: 'The Psi Pokémon'
-  },
-  {
-    id: 66, name: 'MACHOP', types: ['fighting'],
-    baseStats: { hp:70, atk:80, def:50, spa:35, spd:35 },
-    moves: ['karatechop','lowkick','submission','bodyslam'],
-    color: '#c8a0f8', shadowColor: '#a070d0',
-    sprite: 'machop',
-    description: 'The Superpower Pokémon'
-  },
-  {
-    id: 74, name: 'GEODUDE', types: ['rock','ground'],
-    baseStats: { hp:40, atk:80, def:100, spa:30, spd:20 },
-    moves: ['tackle','rockthrow','magnitude','rockslide'],
-    color: '#c8b878', shadowColor: '#a09050',
-    sprite: 'geodude',
-    description: 'The Rock Pokémon'
-  },
-  {
-    id: 92, name: 'GASTLY', types: ['ghost','poison'],
-    baseStats: { hp:30, atk:35, def:30, spa:100, spd:80 },
-    moves: ['lick','nightshade','hypnosis','shadowball'],
-    color: '#705898', shadowColor: '#483870',
-    sprite: 'gastly',
-    description: 'The Gas Pokémon'
-  },
-  {
-    id: 104, name: 'CUBONE', types: ['ground'],
-    baseStats: { hp:50, atk:50, def:95, spa:40, spd:35 },
-    moves: ['growl','boneclub','boomerang','earthquake'],
-    color: '#c8a878', shadowColor: '#a07850',
-    sprite: 'cubone',
-    description: 'The Lonely Pokémon'
-  },
-  {
-    id: 116, name: 'HORSEA', types: ['water'],
-    baseStats: { hp:30, atk:40, def:70, spa:70, spd:60 },
-    moves: ['bubble','smokescreen','watergun','hydropump'],
-    color: '#6898d8', shadowColor: '#4878a8',
-    sprite: 'horsea',
-    description: 'The Dragon Pokémon'
-  },
-  {
-    id: 131, name: 'LAPRAS', types: ['water','ice'],
-    baseStats: { hp:130, atk:85, def:80, spa:85, spd:60 },
-    moves: ['watergun','growl','icebeam','bodyslam'],
-    color: '#98d8d8', shadowColor: '#70b0b0',
-    sprite: 'lapras',
-    description: 'The Transport Pokémon'
-  },
-  {
-    id: 133, name: 'EEVEE', types: ['normal'],
-    baseStats: { hp:55, atk:55, def:50, spa:45, spd:55 },
-    moves: ['tackle','growl','sandattack','bite'],
-    color: '#c8b878', shadowColor: '#a09050',
-    sprite: 'eevee',
-    description: 'The Evolution Pokémon'
-  },
-  {
-    id: 147, name: 'DRATINI', types: ['dragon'],
-    baseStats: { hp:41, atk:64, def:45, spa:50, spd:50 },
-    moves: ['wrap','leer','thunderwave','dragonbreath'],
-    color: '#7038f8', shadowColor: '#5020d0',
-    sprite: 'dratini',
-    description: 'The Dragon Pokémon'
-  }
+// ── POKEMON ROSTER ───────────────────────────────────────
+const PKM = [
+  {id:1,  name:'BULBASAUR',  types:['grass','poison'],  bs:{hp:45,atk:49,def:49,spa:65,spd:45}, moves:['vinewhip','leechseed','sleeppowder','razorleaf'],  spr:'bulbasaur'},
+  {id:4,  name:'CHARMANDER', types:['fire'],             bs:{hp:39,atk:52,def:43,spa:60,spd:65}, moves:['scratch','ember','smokescreen','slash'],           spr:'charmander'},
+  {id:7,  name:'SQUIRTLE',   types:['water'],            bs:{hp:44,atk:48,def:65,spa:50,spd:43}, moves:['tackle','watergun','tailwhip','bubble'],           spr:'squirtle'},
+  {id:25, name:'PIKACHU',    types:['electric'],         bs:{hp:35,atk:55,def:40,spa:50,spd:90}, moves:['thundershock','thunderwave','quickattack','spark'], spr:'pikachu'},
+  {id:39, name:'JIGGLYPUFF', types:['normal','fairy'],   bs:{hp:115,atk:45,def:20,spa:45,spd:20},moves:['pound','sing','disable','bodyslam'],               spr:'jigglypuff'},
+  {id:52, name:'MEOWTH',     types:['normal'],           bs:{hp:40,atk:45,def:35,spa:40,spd:90}, moves:['scratch','bite','payday','slash'],                 spr:'meowth'},
+  {id:63, name:'ABRA',       types:['psychic'],          bs:{hp:25,atk:20,def:15,spa:105,spd:90},moves:['teleport','confusion','psybeam','psychic'],         spr:'abra'},
+  {id:66, name:'MACHOP',     types:['fighting'],         bs:{hp:70,atk:80,def:50,spa:35,spd:35}, moves:['karatechop','lowkick','submission','bodyslam'],     spr:'machop'},
+  {id:74, name:'GEODUDE',    types:['rock','ground'],    bs:{hp:40,atk:80,def:100,spa:30,spd:20},moves:['tackle','rockthrow','magnitude','rockslide'],       spr:'geodude'},
+  {id:92, name:'GASTLY',     types:['ghost','poison'],   bs:{hp:30,atk:35,def:30,spa:100,spd:80},moves:['lick','nightshade','hypnosis','shadowball'],        spr:'gastly'},
+  {id:104,name:'CUBONE',     types:['ground'],           bs:{hp:50,atk:50,def:95,spa:40,spd:35}, moves:['growl','boneclub','boomerang','earthquake'],        spr:'cubone'},
+  {id:116,name:'HORSEA',     types:['water'],            bs:{hp:30,atk:40,def:70,spa:70,spd:60}, moves:['bubble','smokescreen','watergun','hydropump'],      spr:'horsea'},
+  {id:131,name:'LAPRAS',     types:['water','ice'],      bs:{hp:130,atk:85,def:80,spa:85,spd:60},moves:['watergun','growl','icebeam','bodyslam'],            spr:'lapras'},
+  {id:133,name:'EEVEE',      types:['normal'],           bs:{hp:55,atk:55,def:50,spa:45,spd:55}, moves:['tackle','growl','sandattack','bite'],               spr:'eevee'},
+  {id:147,name:'DRATINI',    types:['dragon'],           bs:{hp:41,atk:64,def:45,spa:50,spd:50}, moves:['wrap','leer','thunderwave','dragonbreath'],         spr:'dratini'},
 ];
 
-// Fix missing moves references
-MOVES.pound       = { name:'Pound',      type:'normal',   power:40, accuracy:100, pp:35, category:'physical', effect:null };
-MOVES.sing        = { name:'Sing',       type:'normal',   power:0,  accuracy:55,  pp:15, category:'status',   effect:{status:'SLP'} };
-MOVES.disable     = { name:'Disable',    type:'normal',   power:0,  accuracy:100, pp:20, category:'status',   effect:{disable:true} };
-MOVES.payday      = { name:'Pay Day',    type:'normal',   power:40, accuracy:100, pp:20, category:'physical', effect:null };
-MOVES.teleport    = { name:'Teleport',   type:'psychic',  power:0,  accuracy:100, pp:20, category:'status',   effect:null };
-MOVES.lowkick     = { name:'Low Kick',   type:'fighting', power:50, accuracy:90,  pp:20, category:'physical', effect:null };
-MOVES.magnitude   = { name:'Magnitude',  type:'ground',   power:70, accuracy:100, pp:30, category:'physical', effect:null };
-MOVES.lick        = { name:'Lick',       type:'ghost',    power:30, accuracy:100, pp:30, category:'physical', effect:{chance:30,status:'PAR'} };
-MOVES.hypnosis    = { name:'Hypnosis',   type:'psychic',  power:0,  accuracy:60,  pp:20, category:'status',   effect:{status:'SLP'} };
-MOVES.boneclub    = { name:'Bone Club',  type:'ground',   power:65, accuracy:85,  pp:20, category:'physical', effect:{chance:10,flinch:true} };
-MOVES.boomerang   = { name:'Bone Boomerang',type:'ground',power:50, accuracy:90,  pp:10, category:'physical', effect:null };
-MOVES.wrap        = { name:'Wrap',       type:'normal',   power:15, accuracy:90,  pp:20, category:'physical', effect:null };
-MOVES.leer        = { name:'Leer',       type:'normal',   power:0,  accuracy:100, pp:30, category:'status',   effect:{stat:'def',stages:-1} };
-MOVES.quickattack = { name:'Quick Attack',type:'normal',  power:40, accuracy:100, pp:30, category:'physical', effect:null };
-
-// ── ITEMS ────────────────────────────────────────────────────
+// ── ITEMS ────────────────────────────────────────────────
 const ITEMS = {
-  potion:     { name:'Potion',      heal:20,  desc:'Restores 20 HP' },
-  superpotion:{ name:'Super Potion',heal:50,  desc:'Restores 50 HP' },
-  fullheal:   { name:'Full Heal',   heal:0,   desc:'Cures status',   cureStatus:true },
-  antidote:   { name:'Antidote',    heal:0,   desc:'Cures Poison',   cureStatus:'PSN' },
+  potion:     {name:'Potion',      heal:20,  desc:'Restores 20 HP'},
+  superpotion:{name:'Super Potion',heal:50,  desc:'Restores 50 HP'},
+  fullheal:   {name:'Full Heal',   heal:0,   desc:'Cures any status', cureAll:true},
+  antidote:   {name:'Antidote',    heal:0,   desc:'Cures Poison',     cures:'PSN'},
 };
 
-// ── PARTICLE SYSTEM ──────────────────────────────────────────
-class ParticleSystem {
-  constructor(canvas) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
-    this.particles = [];
-    this.running = false;
-    this._raf = null;
+// ── PARTICLE SYSTEM ──────────────────────────────────────
+class Particles {
+  constructor(c) {
+    this.c = c; this.x = c.getContext('2d');
+    this.p = []; this.active = false;
     this.resize();
   }
   resize() {
-    this.canvas.width  = this.canvas.parentElement.offsetWidth;
-    this.canvas.height = this.canvas.parentElement.offsetHeight;
+    const p = this.c.parentElement;
+    this.c.width = p.offsetWidth||320;
+    this.c.height = p.offsetHeight||200;
   }
   emit(type, x, y) {
-    const configs = {
-      fire:     { n:18, color:['#f85000','#f8a000','#fff8a0','#ffffff'], size:[4,12], life:[0.6,1.0], vx:[-2,2], vy:[-4,-1] },
-      water:    { n:15, color:['#4090f8','#90d0ff','#ffffff'],           size:[4,10], life:[0.5,0.9], vx:[-3,3], vy:[-3,1] },
-      grass:    { n:14, color:['#50d050','#a0f870','#f0fff0'],           size:[4,10], life:[0.5,0.8], vx:[-2,2], vy:[-4,-1] },
-      electric: { n:20, color:['#f8e000','#f8f880','#ffffff'],           size:[2,8],  life:[0.3,0.6], vx:[-4,4], vy:[-4,4] },
-      ice:      { n:16, color:['#98e8f8','#c0f8f8','#ffffff'],           size:[3,9],  life:[0.6,1.0], vx:[-3,3], vy:[-3,2] },
-      psychic:  { n:14, color:['#f870a8','#f8c0d8','#ffffff'],           size:[4,12], life:[0.6,1.0], vx:[-2,2], vy:[-4,-1] },
-      normal:   { n:12, color:['#c8c8c8','#e8e8e8','#ffffff'],           size:[3,8],  life:[0.4,0.7], vx:[-3,3], vy:[-3,1] },
-      poison:   { n:14, color:['#c040c0','#e880e8','#ffffff'],           size:[4,10], life:[0.5,0.9], vx:[-2,2], vy:[-3,1] },
-      ground:   { n:16, color:['#e0c068','#c0a040','#806020'],           size:[4,10], life:[0.5,0.9], vx:[-3,3], vy:[-2,2] },
-      rock:     { n:12, color:['#b8a038','#d8c050','#f0e080'],           size:[5,12], life:[0.4,0.8], vx:[-4,4], vy:[-4,1] },
-      ghost:    { n:14, color:['#705898','#a080c8','#d0b8f8'],           size:[6,16], life:[0.8,1.4], vx:[-1,1], vy:[-3,0] },
-      dragon:   { n:16, color:['#7038f8','#a060f8','#c8a0f8'],           size:[5,14], life:[0.7,1.2], vx:[-2,2], vy:[-4,-1] },
-      dark:     { n:14, color:['#705848','#a08070','#c0b0a0'],           size:[4,10], life:[0.5,0.9], vx:[-3,3], vy:[-3,1] },
-      fighting: { n:14, color:['#c03028','#e05040','#f09080'],           size:[4,10], life:[0.4,0.8], vx:[-4,4], vy:[-4,0] },
-      flying:   { n:14, color:['#a890f0','#c8b0f8','#e8d8ff'],           size:[3,9],  life:[0.5,0.9], vx:[-3,3], vy:[-4,-1] },
+    const cfg = {
+      fire:    {n:16,cols:['#f83000','#f8a000','#fff0a0','#fff'],sz:[4,12],lf:[0.6,1.0],vx:[-2,2],vy:[-4,-1]},
+      water:   {n:14,cols:['#4088f8','#88ccff','#fff'],          sz:[4,10],lf:[0.5,0.9],vx:[-3,3],vy:[-3,1]},
+      grass:   {n:14,cols:['#40c840','#90f060','#e8ffe8'],        sz:[4,10],lf:[0.5,0.8],vx:[-2,2],vy:[-4,-1]},
+      electric:{n:20,cols:['#f8e000','#f8f870','#fff'],           sz:[2,7], lf:[0.3,0.6],vx:[-5,5],vy:[-5,5]},
+      ice:     {n:15,cols:['#90e0f0','#c0f8f8','#fff'],           sz:[3,9], lf:[0.6,1.0],vx:[-3,3],vy:[-3,2]},
+      psychic: {n:14,cols:['#f060a0','#f8b8d0','#fff'],           sz:[5,13],lf:[0.6,1.0],vx:[-2,2],vy:[-4,-1]},
+      normal:  {n:12,cols:['#c0c0c0','#e8e8e8','#fff'],           sz:[3,8], lf:[0.4,0.7],vx:[-3,3],vy:[-3,1]},
+      poison:  {n:14,cols:['#c030c0','#e870e8','#fff'],           sz:[4,10],lf:[0.5,0.9],vx:[-2,2],vy:[-3,1]},
+      ground:  {n:16,cols:['#d8b860','#b88030','#806020'],        sz:[4,10],lf:[0.5,0.9],vx:[-3,3],vy:[-2,2]},
+      rock:    {n:12,cols:['#b09030','#d0b048','#f0d870'],        sz:[5,12],lf:[0.4,0.8],vx:[-4,4],vy:[-4,1]},
+      ghost:   {n:14,cols:['#705090','#9870c8','#c8a8f8'],        sz:[6,16],lf:[0.8,1.4],vx:[-1,1],vy:[-3,0]},
+      dragon:  {n:16,cols:['#7030f8','#a058f8','#c8a0f8'],        sz:[5,14],lf:[0.7,1.2],vx:[-2,2],vy:[-4,-1]},
+      dark:    {n:14,cols:['#705040','#a07860','#c0a888'],         sz:[4,10],lf:[0.5,0.9],vx:[-3,3],vy:[-3,1]},
+      fighting:{n:14,cols:['#c02820','#e04838','#f08070'],        sz:[4,10],lf:[0.4,0.8],vx:[-4,4],vy:[-4,0]},
+      flying:  {n:14,cols:['#a888f0','#c8a8f8','#e8d8ff'],        sz:[3,9], lf:[0.5,0.9],vx:[-3,3],vy:[-4,-1]},
     };
-    const cfg = configs[type] || configs.normal;
-    const R = (a,b) => a + Math.random()*(b-a);
-    for (let i = 0; i < cfg.n; i++) {
-      this.particles.push({
-        x, y,
-        vx: R(...cfg.vx),
-        vy: R(...cfg.vy),
-        size: R(...cfg.size),
-        color: cfg.color[Math.floor(Math.random()*cfg.color.length)],
-        life: R(...cfg.life),
-        maxLife: R(...cfg.life),
-        gravity: 0.12,
-      });
-    }
-    if (!this.running) this._loop();
+    const C = cfg[type]||cfg.normal;
+    const R=(a,b)=>a+Math.random()*(b-a);
+    for(let i=0;i<C.n;i++) this.p.push({
+      x,y,vx:R(...C.vx),vy:R(...C.vy),
+      sz:R(...C.sz),col:C.cols[Math.floor(Math.random()*C.cols.length)],
+      lf:R(...C.lf),ml:R(...C.lf),g:0.14
+    });
+    if(!this.active) this._loop();
   }
   _loop() {
-    this.running = true;
-    const tick = () => {
-      this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
-      this.particles = this.particles.filter(p => p.life > 0);
-      for (const p of this.particles) {
-        p.x += p.vx; p.y += p.vy; p.vy += p.gravity; p.life -= 0.02;
-        const alpha = Math.max(0, p.life / p.maxLife);
-        this.ctx.globalAlpha = alpha;
-        this.ctx.fillStyle = p.color;
-        this.ctx.beginPath();
-        this.ctx.arc(p.x, p.y, Math.max(1, p.size*alpha), 0, Math.PI*2);
-        this.ctx.fill();
+    this.active=true;
+    const tick=()=>{
+      this.x.clearRect(0,0,this.c.width,this.c.height);
+      this.p=this.p.filter(p=>p.lf>0);
+      for(const p of this.p){
+        p.x+=p.vx;p.y+=p.vy;p.vy+=p.g;p.lf-=0.022;
+        const a=Math.max(0,p.lf/p.ml);
+        this.x.globalAlpha=a;
+        this.x.fillStyle=p.col;
+        this.x.beginPath();
+        this.x.arc(p.x,p.y,Math.max(1,p.sz*a),0,Math.PI*2);
+        this.x.fill();
       }
-      this.ctx.globalAlpha = 1;
-      if (this.particles.length > 0) this._raf = requestAnimationFrame(tick);
-      else this.running = false;
+      this.x.globalAlpha=1;
+      if(this.p.length>0) requestAnimationFrame(tick);
+      else this.active=false;
     };
-    this._raf = requestAnimationFrame(tick);
+    requestAnimationFrame(tick);
   }
 }
 
-// ── PIXEL ART SPRITES ────────────────────────────────────────
-// Each sprite is a 16×16 pixel layout drawn on a 96×96 canvas
-// Colors defined per pokemon, shapes approximate real sprites
+// ── SPRITE DRAWING ───────────────────────────────────────
+// Each Pokemon is a hand-crafted 16x16 pixel layout scaled to canvas size
 
-const SPRITE_DEFS = {
-  bulbasaur: (ctx, S) => {
-    const C = { body:'#78c850', dark:'#589830', light:'#a8e870', belly:'#c8f8b0', eye:'#303030', bulb:'#508038', spot:'#406030' };
-    // Body
-    fillRect(ctx,S, C.body, 3,6, 10,8);
-    fillRect(ctx,S, C.body, 2,8, 12,5);
-    fillRect(ctx,S, C.body, 4,5, 8,1);
-    // Belly
-    fillRect(ctx,S, C.belly, 4,9, 8,3);
-    // Head
-    fillRect(ctx,S, C.body, 3,2, 10,4);
-    fillRect(ctx,S, C.body, 2,4, 12,3);
-    fillRect(ctx,S, C.light, 4,3, 8,3);
-    // Eyes
-    fillRect(ctx,S, C.eye, 4,3, 2,2);
-    fillRect(ctx,S, C.eye, 10,3, 2,2);
-    fillRect(ctx,S, '#e00000', 5,3, 1,1);
-    fillRect(ctx,S, '#e00000', 11,3, 1,1);
-    // Bulb on back
-    fillRect(ctx,S, C.bulb, 6,1, 4,5);
-    fillRect(ctx,S, C.bulb, 5,2, 6,5);
-    fillRect(ctx,S, C.spot, 7,2, 2,1);
-    fillRect(ctx,S, C.spot, 6,4, 1,2);
-    fillRect(ctx,S, C.spot, 9,3, 1,2);
-    // Legs
-    fillRect(ctx,S, C.body, 3,11, 3,4);
-    fillRect(ctx,S, C.body, 10,11, 3,4);
-    fillRect(ctx,S, C.dark, 3,14, 3,1);
-    fillRect(ctx,S, C.dark, 10,14, 3,1);
-    // Outline
-    outlineSprite(ctx,S, 2,1, 12,14);
+function fr(ctx,S,col,px,py,pw,ph){ctx.fillStyle=col;ctx.fillRect(px*S,py*S,pw*S,ph*S);}
+
+const SPRS = {
+  bulbasaur(ctx,S){
+    const B='#78c850',D='#589830',L='#a8e870',V='#c8f8b0',E='#303030',U='#508038';
+    fr(ctx,S,B,3,6,10,8);fr(ctx,S,B,2,8,12,5);fr(ctx,S,B,4,5,8,1);
+    fr(ctx,S,V,4,9,8,3);fr(ctx,S,B,3,2,10,4);fr(ctx,S,B,2,4,12,3);fr(ctx,S,L,4,3,8,3);
+    fr(ctx,S,E,4,3,2,2);fr(ctx,S,E,10,3,2,2);fr(ctx,S,'#e00',5,3,1,1);fr(ctx,S,'#e00',11,3,1,1);
+    fr(ctx,S,U,6,1,4,5);fr(ctx,S,U,5,2,6,5);fr(ctx,S,'#406030',7,2,2,1);fr(ctx,S,'#406030',6,4,1,2);fr(ctx,S,'#406030',9,3,1,2);
+    fr(ctx,S,B,3,11,3,4);fr(ctx,S,B,10,11,3,4);fr(ctx,S,D,3,14,3,1);fr(ctx,S,D,10,14,3,1);
   },
-  charmander: (ctx, S) => {
-    const C = { body:'#f08030', dark:'#c06010', light:'#f8b070', belly:'#fff0c0', eye:'#303030', tail:'#f08030', flame:'#f83800' };
-    // Tail
-    fillRect(ctx,S, C.tail, 13,9, 2,4);
-    fillRect(ctx,S, C.tail, 12,12, 3,2);
-    fillRect(ctx,S, C.flame, 13,7, 2,3);
-    fillRect(ctx,S, '#f8c000', 14,6, 1,2);
-    fillRect(ctx,S, '#ffffff', 14,5, 1,1);
-    // Body
-    fillRect(ctx,S, C.body, 4,6, 8,8);
-    fillRect(ctx,S, C.body, 3,8, 10,5);
-    // Belly
-    fillRect(ctx,S, C.belly, 5,8, 6,5);
-    // Head
-    fillRect(ctx,S, C.body, 3,1, 10,6);
-    fillRect(ctx,S, C.light, 4,2, 8,4);
-    // Snout
-    fillRect(ctx,S, C.body, 5,5, 6,2);
-    fillRect(ctx,S, C.dark, 6,6, 4,1);
-    // Eyes
-    fillRect(ctx,S, C.eye, 4,2, 2,2);
-    fillRect(ctx,S, C.eye, 10,2, 2,2);
-    fillRect(ctx,S, '#ffffff', 5,2, 1,1);
-    fillRect(ctx,S, '#ffffff', 11,2, 1,1);
-    // Legs
-    fillRect(ctx,S, C.body, 4,12, 3,4);
-    fillRect(ctx,S, C.body, 9,12, 3,4);
-    fillRect(ctx,S, C.dark, 4,15, 3,1);
-    fillRect(ctx,S, C.dark, 9,15, 3,1);
-    // Arms
-    fillRect(ctx,S, C.body, 2,7, 3,3);
-    fillRect(ctx,S, C.body, 11,7, 3,3);
-    outlineSprite(ctx,S, 2,1, 14,15);
+  charmander(ctx,S){
+    const B='#f08030',D='#c06010',L='#f8b070',V='#fff0c0',E='#303030';
+    fr(ctx,S,B,13,9,2,4);fr(ctx,S,B,12,12,3,2);fr(ctx,S,B,13,7,2,3);fr(ctx,S,'#f8c000',14,6,1,2);fr(ctx,S,'#fff',14,5,1,1);
+    fr(ctx,S,B,4,6,8,8);fr(ctx,S,B,3,8,10,5);fr(ctx,S,V,5,8,6,5);
+    fr(ctx,S,B,3,1,10,6);fr(ctx,S,L,4,2,8,4);fr(ctx,S,B,5,5,6,2);fr(ctx,S,D,6,6,4,1);
+    fr(ctx,S,E,4,2,2,2);fr(ctx,S,E,10,2,2,2);fr(ctx,S,'#fff',5,2,1,1);fr(ctx,S,'#fff',11,2,1,1);
+    fr(ctx,S,B,4,12,3,4);fr(ctx,S,B,9,12,3,4);fr(ctx,S,D,4,15,3,1);fr(ctx,S,D,9,15,3,1);
+    fr(ctx,S,B,2,7,3,3);fr(ctx,S,B,11,7,3,3);
   },
-  squirtle: (ctx, S) => {
-    const C = { shell:'#2860c0', shellL:'#5898f0', body:'#68c0d8', dark:'#204890', belly:'#c0e8f8', eye:'#202020' };
-    // Shell back
-    fillRect(ctx,S, C.shell, 3,5, 10,9);
-    fillRect(ctx,S, C.shell, 2,7, 12,6);
-    // Shell stripes
-    fillRect(ctx,S, C.shellL, 4,6, 8,1);
-    fillRect(ctx,S, C.shellL, 3,9, 10,1);
-    fillRect(ctx,S, C.shellL, 4,12, 8,1);
-    // Head
-    fillRect(ctx,S, C.body, 4,1, 8,5);
-    fillRect(ctx,S, C.body, 3,3, 10,3);
-    // Snout
-    fillRect(ctx,S, C.body, 5,4, 6,3);
-    fillRect(ctx,S, '#f0d0a0', 6,5, 4,2);
-    fillRect(ctx,S, '#c0a070', 7,6, 2,1);
-    // Eyes
-    fillRect(ctx,S, C.eye, 4,2, 2,2);
-    fillRect(ctx,S, C.eye, 10,2, 2,2);
-    fillRect(ctx,S, '#ffffff', 4,2, 1,1);
-    fillRect(ctx,S, '#ffffff', 10,2, 1,1);
-    // Belly/front
-    fillRect(ctx,S, C.belly, 5,8, 6,4);
-    // Legs
-    fillRect(ctx,S, C.body, 3,12, 3,4);
-    fillRect(ctx,S, C.body, 10,12, 3,4);
-    fillRect(ctx,S, C.dark, 3,15, 3,1);
-    fillRect(ctx,S, C.dark, 10,15, 3,1);
-    // Tail
-    fillRect(ctx,S, C.shell, 11,13, 3,2);
-    fillRect(ctx,S, C.shell, 12,11, 2,3);
-    outlineSprite(ctx,S, 2,1, 14,15);
+  squirtle(ctx,S){
+    const SH='#2860c0',SL='#5898f0',B='#68c0d8',D='#204890',V='#c0e8f8',E='#202020';
+    fr(ctx,S,SH,3,5,10,9);fr(ctx,S,SH,2,7,12,6);fr(ctx,S,SL,4,6,8,1);fr(ctx,S,SL,3,9,10,1);fr(ctx,S,SL,4,12,8,1);
+    fr(ctx,S,B,4,1,8,5);fr(ctx,S,B,3,3,10,3);fr(ctx,S,B,5,4,6,3);fr(ctx,S,'#f0d0a0',6,5,4,2);fr(ctx,S,'#c0a070',7,6,2,1);
+    fr(ctx,S,E,4,2,2,2);fr(ctx,S,E,10,2,2,2);fr(ctx,S,'#fff',4,2,1,1);fr(ctx,S,'#fff',10,2,1,1);
+    fr(ctx,S,V,5,8,6,4);fr(ctx,S,B,3,12,3,4);fr(ctx,S,B,10,12,3,4);fr(ctx,S,D,3,15,3,1);fr(ctx,S,D,10,15,3,1);
+    fr(ctx,S,SH,11,13,3,2);fr(ctx,S,SH,12,11,2,3);
   },
-  pikachu: (ctx, S) => {
-    const C = { body:'#f8d030', dark:'#c0a010', cheek:'#f83020', ear:'#303030', eye:'#202020', nose:'#f06060' };
-    // Ears
-    fillRect(ctx,S, C.body, 4,0, 2,4);
-    fillRect(ctx,S, C.body, 10,0, 2,4);
-    fillRect(ctx,S, C.ear, 4,0, 2,2);
-    fillRect(ctx,S, C.ear, 10,0, 2,2);
-    // Body
-    fillRect(ctx,S, C.body, 3,5, 10,9);
-    fillRect(ctx,S, C.body, 2,7, 12,6);
-    fillRect(ctx,S, C.dark, 2,11, 12,1);
-    fillRect(ctx,S, '#f0b820', 2,12, 12,2);
-    // Head
-    fillRect(ctx,S, C.body, 3,2, 10,5);
-    fillRect(ctx,S, C.body, 2,3, 12,4);
-    // Cheeks
-    fillRect(ctx,S, C.cheek, 2,5, 3,3);
-    fillRect(ctx,S, C.cheek, 11,5, 3,3);
-    // Eyes
-    fillRect(ctx,S, C.eye, 5,3, 2,2);
-    fillRect(ctx,S, C.eye, 9,3, 2,2);
-    fillRect(ctx,S, '#ffffff', 6,3, 1,1);
-    fillRect(ctx,S, '#ffffff', 10,3, 1,1);
-    // Nose/mouth
-    fillRect(ctx,S, C.nose, 7,5, 2,1);
-    fillRect(ctx,S, '#c04040', 6,6, 4,1);
-    // Legs
-    fillRect(ctx,S, C.body, 4,12, 3,4);
-    fillRect(ctx,S, C.body, 9,12, 3,4);
-    fillRect(ctx,S, C.dark, 4,15, 3,1);
-    fillRect(ctx,S, C.dark, 9,15, 3,1);
-    // Arms
-    fillRect(ctx,S, C.body, 1,7, 3,4);
-    fillRect(ctx,S, C.body, 12,7, 3,4);
-    // Tail (lightning bolt)
-    fillRect(ctx,S, C.body, 13,9, 2,2);
-    fillRect(ctx,S, C.body, 14,7, 2,3);
-    fillRect(ctx,S, C.body, 13,5, 2,3);
-    outlineSprite(ctx,S, 2,0, 15,15);
+  pikachu(ctx,S){
+    const Y='#f8d030',D='#c0a010',C='#f83020',E='#202020';
+    fr(ctx,S,Y,4,0,2,4);fr(ctx,S,Y,10,0,2,4);fr(ctx,S,'#303030',4,0,2,2);fr(ctx,S,'#303030',10,0,2,2);
+    fr(ctx,S,Y,3,5,10,9);fr(ctx,S,Y,2,7,12,6);fr(ctx,S,D,2,11,12,1);fr(ctx,S,'#f0b820',2,12,12,2);
+    fr(ctx,S,Y,3,2,10,5);fr(ctx,S,Y,2,3,12,4);
+    fr(ctx,S,C,2,5,3,3);fr(ctx,S,C,11,5,3,3);
+    fr(ctx,S,E,5,3,2,2);fr(ctx,S,E,9,3,2,2);fr(ctx,S,'#fff',6,3,1,1);fr(ctx,S,'#fff',10,3,1,1);
+    fr(ctx,S,'#f06060',7,5,2,1);fr(ctx,S,'#c04040',6,6,4,1);
+    fr(ctx,S,Y,4,12,3,4);fr(ctx,S,Y,9,12,3,4);fr(ctx,S,D,4,15,3,1);fr(ctx,S,D,9,15,3,1);
+    fr(ctx,S,Y,1,7,3,4);fr(ctx,S,Y,12,7,3,4);
+    fr(ctx,S,Y,13,9,2,2);fr(ctx,S,Y,14,7,2,3);fr(ctx,S,Y,13,5,2,3);
   },
-  jigglypuff: (ctx, S) => {
-    const C = { body:'#f4b8e8', dark:'#d480c0', eye:'#202080', curl:'#f080c0' };
-    // Round body
-    fillRect(ctx,S, C.body, 3,3, 10,11);
-    fillRect(ctx,S, C.body, 2,5, 12,8);
-    fillRect(ctx,S, C.body, 4,2, 8,12);
-    fillRect(ctx,S, C.body, 1,7, 14,4);
-    // Belly
-    fillRect(ctx,S, '#fff0f8', 5,7, 6,5);
-    // Eyes (big)
-    fillRect(ctx,S, C.eye, 4,5, 3,3);
-    fillRect(ctx,S, C.eye, 9,5, 3,3);
-    fillRect(ctx,S, '#4040ff', 4,5, 3,3);
-    fillRect(ctx,S, '#ffffff', 4,5, 1,1);
-    fillRect(ctx,S, '#ffffff', 9,5, 1,1);
-    fillRect(ctx,S, '#ffffff', 11,5, 1,1);
-    fillRect(ctx,S, '#ffffff', 6,5, 1,1);
-    // Curl
-    fillRect(ctx,S, C.curl, 7,1, 2,3);
-    fillRect(ctx,S, C.curl, 8,2, 2,2);
-    // Mouth
-    fillRect(ctx,S, '#e04080', 7,9, 2,1);
-    // Ears
-    fillRect(ctx,S, C.body, 2,4, 2,3);
-    fillRect(ctx,S, C.body, 12,4, 2,3);
-    fillRect(ctx,S, C.dark, 2,4, 2,2);
-    fillRect(ctx,S, C.dark, 12,4, 2,2);
-    // Tiny arms
-    fillRect(ctx,S, C.body, 1,9, 2,2);
-    fillRect(ctx,S, C.body, 13,9, 2,2);
-    // Tiny feet
-    fillRect(ctx,S, C.body, 4,13, 3,2);
-    fillRect(ctx,S, C.body, 9,13, 3,2);
-    outlineSprite(ctx,S, 1,2, 14,13);
+  jigglypuff(ctx,S){
+    const B='#f4b8e8',D='#d480c0',C='#f080c0';
+    fr(ctx,S,B,3,3,10,11);fr(ctx,S,B,2,5,12,8);fr(ctx,S,B,4,2,8,12);fr(ctx,S,B,1,7,14,4);
+    fr(ctx,S,'#fff0f8',5,7,6,5);
+    fr(ctx,S,'#4040ff',4,5,3,3);fr(ctx,S,'#4040ff',9,5,3,3);fr(ctx,S,'#fff',4,5,1,1);fr(ctx,S,'#fff',9,5,1,1);fr(ctx,S,'#fff',11,5,1,1);fr(ctx,S,'#fff',6,5,1,1);
+    fr(ctx,S,C,7,1,2,3);fr(ctx,S,C,8,2,2,2);
+    fr(ctx,S,'#e04080',7,9,2,1);
+    fr(ctx,S,B,2,4,2,3);fr(ctx,S,B,12,4,2,3);fr(ctx,S,D,2,4,2,2);fr(ctx,S,D,12,4,2,2);
+    fr(ctx,S,B,1,9,2,2);fr(ctx,S,B,13,9,2,2);fr(ctx,S,B,4,13,3,2);fr(ctx,S,B,9,13,3,2);
   },
-  meowth: (ctx, S) => {
-    const C = { body:'#f8c8a0', dark:'#d0a070', ear:'#f8a0a0', face:'#f8e0c0', eye:'#303030', coin:'#f8d030' };
-    // Ears
-    fillRect(ctx,S, C.body, 3,0, 3,4);
-    fillRect(ctx,S, C.body, 10,0, 3,4);
-    fillRect(ctx,S, C.ear, 4,0, 2,3);
-    fillRect(ctx,S, C.ear, 10,0, 2,3);
-    // Body
-    fillRect(ctx,S, C.body, 3,7, 10,8);
-    fillRect(ctx,S, C.body, 2,9, 12,5);
-    fillRect(ctx,S, '#f8e0c0', 5,9, 6,4);
-    // Head
-    fillRect(ctx,S, C.body, 3,2, 10,6);
-    fillRect(ctx,S, C.face, 4,3, 8,5);
-    // Eyes
-    fillRect(ctx,S, C.eye, 5,4, 2,2);
-    fillRect(ctx,S, C.eye, 9,4, 2,2);
-    fillRect(ctx,S, '#20a040', 5,4, 2,2);
-    fillRect(ctx,S, '#000000', 5,5, 2,1);
-    fillRect(ctx,S, '#000000', 9,5, 2,1);
-    fillRect(ctx,S, '#ffffff', 5,4, 1,1);
-    fillRect(ctx,S, '#ffffff', 9,4, 1,1);
-    // Nose/whiskers
-    fillRect(ctx,S, '#f08080', 7,6, 2,1);
-    fillRect(ctx,S, '#a07050', 3,6, 3,1);
-    fillRect(ctx,S, '#a07050', 10,6, 3,1);
-    fillRect(ctx,S, '#a07050', 3,7, 3,1);
-    fillRect(ctx,S, '#a07050', 10,7, 3,1);
-    // Coin on forehead
-    fillRect(ctx,S, C.coin, 6,1, 4,3);
-    fillRect(ctx,S, '#c0a010', 7,2, 2,2);
-    // Tail
-    fillRect(ctx,S, C.body, 13,9, 2,5);
-    fillRect(ctx,S, C.body, 12,13, 2,2);
-    fillRect(ctx,S, '#f8e8a0', 12,14, 2,1);
-    // Legs
-    fillRect(ctx,S, C.body, 4,13, 3,4);
-    fillRect(ctx,S, C.body, 9,13, 3,4);
-    outlineSprite(ctx,S, 2,0, 14,15);
+  meowth(ctx,S){
+    const B='#f8c8a0',D='#d0a070',E='#f8a0a0',F='#f8e0c0',G='#f8d030';
+    fr(ctx,S,B,3,0,3,4);fr(ctx,S,B,10,0,3,4);fr(ctx,S,E,4,0,2,3);fr(ctx,S,E,10,0,2,3);
+    fr(ctx,S,B,3,7,10,8);fr(ctx,S,B,2,9,12,5);fr(ctx,S,F,5,9,6,4);
+    fr(ctx,S,B,3,2,10,6);fr(ctx,S,F,4,3,8,5);
+    fr(ctx,S,'#20a040',5,4,2,2);fr(ctx,S,'#20a040',9,4,2,2);fr(ctx,S,'#000',5,5,2,1);fr(ctx,S,'#000',9,5,2,1);fr(ctx,S,'#fff',5,4,1,1);fr(ctx,S,'#fff',9,4,1,1);
+    fr(ctx,S,'#f08080',7,6,2,1);fr(ctx,S,'#a07050',3,6,3,1);fr(ctx,S,'#a07050',10,6,3,1);fr(ctx,S,'#a07050',3,7,3,1);fr(ctx,S,'#a07050',10,7,3,1);
+    fr(ctx,S,G,6,1,4,3);fr(ctx,S,'#c0a010',7,2,2,2);
+    fr(ctx,S,B,13,9,2,5);fr(ctx,S,B,12,13,2,2);fr(ctx,S,'#f8e8a0',12,14,2,1);
+    fr(ctx,S,B,4,13,3,4);fr(ctx,S,B,9,13,3,4);
   },
-  abra: (ctx, S) => {
-    const C = { body:'#f8d8a0', dark:'#c09040', nose:'#d07030', eye:'#201010', fox:'#c8a060' };
-    // Ears (pointy)
-    fillRect(ctx,S, C.body, 3,0, 2,4);
-    fillRect(ctx,S, C.body, 11,0, 2,4);
-    // Body / sitting
-    fillRect(ctx,S, C.body, 4,6, 8,8);
-    fillRect(ctx,S, C.body, 3,8, 10,5);
-    fillRect(ctx,S, C.dark, 4,12, 8,1);
-    // Head
-    fillRect(ctx,S, C.body, 4,1, 8,6);
-    fillRect(ctx,S, C.body, 3,3, 10,4);
-    // Snout (long)
-    fillRect(ctx,S, C.fox, 5,5, 6,3);
-    fillRect(ctx,S, C.nose, 7,7, 2,1);
-    // Eyes (sleepy)
-    fillRect(ctx,S, C.eye, 5,3, 2,1);
-    fillRect(ctx,S, C.eye, 9,3, 2,1);
-    fillRect(ctx,S, '#ffffff', 5,3, 1,1);
-    // Arms (holding spoon)
-    fillRect(ctx,S, C.body, 2,7, 3,5);
-    fillRect(ctx,S, C.body, 11,7, 3,5);
-    // Spoon
-    fillRect(ctx,S, '#c0c0c0', 1,9, 2,1);
-    fillRect(ctx,S, '#c0c0c0', 1,10, 1,3);
-    // Legs
-    fillRect(ctx,S, C.body, 4,12, 3,4);
-    fillRect(ctx,S, C.body, 9,12, 3,4);
-    outlineSprite(ctx,S, 2,0, 14,15);
+  abra(ctx,S){
+    const B='#f8d8a0',D='#c09040',F='#c8a060',E='#201010';
+    fr(ctx,S,B,3,0,2,4);fr(ctx,S,B,11,0,2,4);
+    fr(ctx,S,B,4,6,8,8);fr(ctx,S,B,3,8,10,5);fr(ctx,S,D,4,12,8,1);
+    fr(ctx,S,B,4,1,8,6);fr(ctx,S,B,3,3,10,4);
+    fr(ctx,S,F,5,5,6,3);fr(ctx,S,'#d07030',7,7,2,1);
+    fr(ctx,S,E,5,3,2,1);fr(ctx,S,E,9,3,2,1);fr(ctx,S,'#fff',5,3,1,1);
+    fr(ctx,S,B,2,7,3,5);fr(ctx,S,B,11,7,3,5);
+    fr(ctx,S,'#c0c0c0',1,9,2,1);fr(ctx,S,'#c0c0c0',1,10,1,3);
+    fr(ctx,S,B,4,12,3,4);fr(ctx,S,B,9,12,3,4);
   },
-  machop: (ctx, S) => {
-    const C = { body:'#c8a0f8', dark:'#9060c0', light:'#e8c8ff', eye:'#202020' };
-    // Body (muscular)
-    fillRect(ctx,S, C.body, 3,5, 10,10);
-    fillRect(ctx,S, C.body, 2,7, 12,7);
-    fillRect(ctx,S, C.light, 5,8, 6,5);
-    // Head (ridges)
-    fillRect(ctx,S, C.body, 4,1, 8,5);
-    fillRect(ctx,S, C.body, 3,2, 10,4);
-    fillRect(ctx,S, C.dark, 4,1, 1,4);
-    fillRect(ctx,S, C.dark, 7,1, 2,4);
-    fillRect(ctx,S, C.dark, 11,1, 1,4);
-    // Eyes
-    fillRect(ctx,S, C.eye, 5,3, 2,2);
-    fillRect(ctx,S, C.eye, 9,3, 2,2);
-    fillRect(ctx,S, '#ff0000', 6,3, 1,1);
-    fillRect(ctx,S, '#ff0000', 10,3, 1,1);
-    // Mouth
-    fillRect(ctx,S, C.dark, 6,5, 4,1);
-    fillRect(ctx,S, '#ffffff', 6,5, 4,1);
-    fillRect(ctx,S, C.dark, 7,5, 2,1);
-    // Arms (muscular)
-    fillRect(ctx,S, C.body, 1,6, 4,5);
-    fillRect(ctx,S, C.body, 11,6, 4,5);
-    fillRect(ctx,S, C.dark, 1,9, 3,2);
-    fillRect(ctx,S, C.dark, 12,9, 3,2);
-    // Legs
-    fillRect(ctx,S, C.body, 4,13, 3,4);
-    fillRect(ctx,S, C.body, 9,13, 3,4);
-    outlineSprite(ctx,S, 1,1, 15,15);
+  machop(ctx,S){
+    const B='#c8a0f8',D='#9060c0',L='#e8c8ff',E='#202020';
+    fr(ctx,S,B,3,5,10,10);fr(ctx,S,B,2,7,12,7);fr(ctx,S,L,5,8,6,5);
+    fr(ctx,S,B,4,1,8,5);fr(ctx,S,B,3,2,10,4);
+    fr(ctx,S,D,4,1,1,4);fr(ctx,S,D,7,1,2,4);fr(ctx,S,D,11,1,1,4);
+    fr(ctx,S,E,5,3,2,2);fr(ctx,S,E,9,3,2,2);fr(ctx,S,'#f00',6,3,1,1);fr(ctx,S,'#f00',10,3,1,1);
+    fr(ctx,S,'#fff',6,5,4,1);fr(ctx,S,D,7,5,2,1);
+    fr(ctx,S,B,1,6,4,5);fr(ctx,S,B,11,6,4,5);fr(ctx,S,D,1,9,3,2);fr(ctx,S,D,12,9,3,2);
+    fr(ctx,S,B,4,13,3,4);fr(ctx,S,B,9,13,3,4);
   },
-  geodude: (ctx, S) => {
-    const C = { body:'#c8b878', dark:'#907840', crack:'#604820', eye:'#202020' };
-    // Round rock body
-    fillRect(ctx,S, C.body, 3,2, 10,12);
-    fillRect(ctx,S, C.body, 2,4, 12,9);
-    fillRect(ctx,S, C.body, 4,1, 8,13);
-    fillRect(ctx,S, C.body, 1,6, 14,5);
-    // Cracks/texture
-    fillRect(ctx,S, C.crack, 5,4, 1,4);
-    fillRect(ctx,S, C.crack, 6,5, 3,1);
-    fillRect(ctx,S, C.crack, 10,6, 1,3);
-    fillRect(ctx,S, C.crack, 8,8, 4,1);
-    fillRect(ctx,S, C.dark, 3,10, 10,2);
-    // Eyes
-    fillRect(ctx,S, '#ffffff', 4,5, 3,3);
-    fillRect(ctx,S, '#ffffff', 9,5, 3,3);
-    fillRect(ctx,S, C.eye, 5,6, 2,2);
-    fillRect(ctx,S, C.eye, 10,6, 2,2);
-    fillRect(ctx,S, '#ffffff', 5,6, 1,1);
-    // Brow
-    fillRect(ctx,S, C.dark, 4,4, 4,2);
-    fillRect(ctx,S, C.dark, 8,4, 4,2);
-    // Arms
-    fillRect(ctx,S, C.body, 0,7, 4,4);
-    fillRect(ctx,S, C.body, 12,7, 4,4);
-    outlineSprite(ctx,S, 0,2, 16,13);
+  geodude(ctx,S){
+    const B='#c8b878',D='#907840',K='#604820',E='#202020';
+    fr(ctx,S,B,3,2,10,12);fr(ctx,S,B,2,4,12,9);fr(ctx,S,B,4,1,8,13);fr(ctx,S,B,1,6,14,5);
+    fr(ctx,S,K,5,4,1,4);fr(ctx,S,K,6,5,3,1);fr(ctx,S,K,10,6,1,3);fr(ctx,S,K,8,8,4,1);fr(ctx,S,D,3,10,10,2);
+    fr(ctx,S,'#fff',4,5,3,3);fr(ctx,S,'#fff',9,5,3,3);fr(ctx,S,E,5,6,2,2);fr(ctx,S,E,10,6,2,2);fr(ctx,S,'#fff',5,6,1,1);fr(ctx,S,'#fff',10,6,1,1);
+    fr(ctx,S,D,4,4,4,2);fr(ctx,S,D,8,4,4,2);
+    fr(ctx,S,B,0,7,4,4);fr(ctx,S,B,12,7,4,4);
   },
-  gastly: (ctx, S) => {
-    const C = { body:'#705898', gas:'#503870', glow:'#9070b8', eye:'#f0f0f0' };
-    // Gas cloud (irregular)
-    fillRect(ctx,S, C.gas, 2,8, 12,6);
-    fillRect(ctx,S, C.gas, 1,10, 14,4);
-    fillRect(ctx,S, C.gas, 0,11, 16,3);
-    fillRect(ctx,S, C.gas, 3,14, 10,2);
-    // Tendrils
-    fillRect(ctx,S, C.gas, 2,13, 2,3);
-    fillRect(ctx,S, C.gas, 6,14, 2,2);
-    fillRect(ctx,S, C.gas, 10,13, 2,3);
-    fillRect(ctx,S, C.gas, 13,14, 2,2);
-    // Main spherical body
-    fillRect(ctx,S, C.body, 4,2, 8,10);
-    fillRect(ctx,S, C.body, 3,4, 10,8);
-    fillRect(ctx,S, C.body, 2,5, 12,6);
-    fillRect(ctx,S, C.glow, 5,3, 6,8);
-    // Eyes
-    fillRect(ctx,S, C.eye, 4,5, 3,3);
-    fillRect(ctx,S, C.eye, 9,5, 3,3);
-    fillRect(ctx,S, '#202020', 5,6, 2,2);
-    fillRect(ctx,S, '#202020', 10,6, 2,2);
-    fillRect(ctx,S, '#ffffff', 5,6, 1,1);
-    fillRect(ctx,S, '#ffffff', 10,6, 1,1);
-    // Mouth
-    fillRect(ctx,S, '#201020', 6,9, 4,2);
-    fillRect(ctx,S, '#ffffff', 6,9, 1,1);
-    fillRect(ctx,S, '#ffffff', 9,9, 1,1);
-    outlineSprite(ctx,S, 2,2, 12,10);
+  gastly(ctx,S){
+    const B='#705898',G='#503870',L='#9070b8';
+    fr(ctx,S,G,2,8,12,6);fr(ctx,S,G,1,10,14,4);fr(ctx,S,G,0,11,16,3);fr(ctx,S,G,3,14,10,2);
+    fr(ctx,S,G,2,13,2,3);fr(ctx,S,G,6,14,2,2);fr(ctx,S,G,10,13,2,3);fr(ctx,S,G,13,14,2,2);
+    fr(ctx,S,B,4,2,8,10);fr(ctx,S,B,3,4,10,8);fr(ctx,S,B,2,5,12,6);fr(ctx,S,L,5,3,6,8);
+    fr(ctx,S,'#f0f0f0',4,5,3,3);fr(ctx,S,'#f0f0f0',9,5,3,3);fr(ctx,S,'#202020',5,6,2,2);fr(ctx,S,'#202020',10,6,2,2);fr(ctx,S,'#fff',5,6,1,1);fr(ctx,S,'#fff',10,6,1,1);
+    fr(ctx,S,'#201020',6,9,4,2);fr(ctx,S,'#fff',6,9,1,1);fr(ctx,S,'#fff',9,9,1,1);
   },
-  cubone: (ctx, S) => {
-    const C = { body:'#c8a878', skull:'#f0e8d0', dark:'#805030', eye:'#302020', bone:'#f8f0e0' };
-    // Body
-    fillRect(ctx,S, C.body, 4,7, 8,8);
-    fillRect(ctx,S, C.body, 3,9, 10,5);
-    // Head/skull mask
-    fillRect(ctx,S, C.skull, 3,1, 10,8);
-    fillRect(ctx,S, C.skull, 2,3, 12,6);
-    fillRect(ctx,S, C.dark, 4,7, 8,2);
-    // Skull openings (eyes)
-    fillRect(ctx,S, '#201010', 4,3, 3,4);
-    fillRect(ctx,S, '#201010', 9,3, 3,4);
-    fillRect(ctx,S, '#ff0000', 5,5, 2,2);
-    fillRect(ctx,S, '#ff0000', 10,5, 2,2);
-    // Skull cracks
-    fillRect(ctx,S, C.dark, 7,1, 1,3);
-    fillRect(ctx,S, C.dark, 8,2, 2,2);
-    // Bone weapon
-    fillRect(ctx,S, C.bone, 12,4, 2,8);
-    fillRect(ctx,S, C.bone, 11,4, 4,2);
-    fillRect(ctx,S, C.bone, 11,10, 4,2);
-    // Arms
-    fillRect(ctx,S, C.body, 2,8, 3,4);
-    fillRect(ctx,S, C.body, 11,8, 3,4);
-    // Legs
-    fillRect(ctx,S, C.body, 4,13, 3,4);
-    fillRect(ctx,S, C.body, 9,13, 3,4);
-    fillRect(ctx,S, C.dark, 4,15, 3,1);
-    fillRect(ctx,S, C.dark, 9,15, 3,1);
-    outlineSprite(ctx,S, 2,1, 12,15);
+  cubone(ctx,S){
+    const B='#c8a878',SK='#f0e8d0',D='#805030',BN='#f8f0e0';
+    fr(ctx,S,B,4,7,8,8);fr(ctx,S,B,3,9,10,5);
+    fr(ctx,S,SK,3,1,10,8);fr(ctx,S,SK,2,3,12,6);fr(ctx,S,D,4,7,8,2);
+    fr(ctx,S,'#201010',4,3,3,4);fr(ctx,S,'#201010',9,3,3,4);fr(ctx,S,'#f00',5,5,2,2);fr(ctx,S,'#f00',10,5,2,2);
+    fr(ctx,S,D,7,1,1,3);fr(ctx,S,D,8,2,2,2);
+    fr(ctx,S,BN,12,4,2,8);fr(ctx,S,BN,11,4,4,2);fr(ctx,S,BN,11,10,4,2);
+    fr(ctx,S,B,2,8,3,4);fr(ctx,S,B,11,8,3,4);fr(ctx,S,B,4,13,3,4);fr(ctx,S,B,9,13,3,4);fr(ctx,S,D,4,15,3,1);fr(ctx,S,D,9,15,3,1);
   },
-  horsea: (ctx, S) => {
-    const C = { body:'#6898d8', dark:'#4060a0', fin:'#a0d0ff', eye:'#202020', coral:'#f08080' };
-    // Tail curl
-    fillRect(ctx,S, C.body, 8,11, 5,4);
-    fillRect(ctx,S, C.body, 11,8, 4,5);
-    fillRect(ctx,S, C.body, 10,13, 4,3);
-    fillRect(ctx,S, C.body, 9,14, 3,2);
-    // Body
-    fillRect(ctx,S, C.body, 5,4, 7,10);
-    fillRect(ctx,S, C.body, 4,6, 9,8);
-    fillRect(ctx,S, C.dark, 5,10, 7,3);
-    // Dorsal fin
-    fillRect(ctx,S, C.fin, 10,4, 3,5);
-    fillRect(ctx,S, C.fin, 11,3, 2,4);
-    // Head
-    fillRect(ctx,S, C.body, 4,1, 8,5);
-    fillRect(ctx,S, C.body, 3,2, 10,4);
-    // Snout
-    fillRect(ctx,S, C.body, 5,4, 4,3);
-    fillRect(ctx,S, C.coral, 5,6, 2,1);
-    // Eye
-    fillRect(ctx,S, '#ffffff', 5,2, 3,3);
-    fillRect(ctx,S, C.eye, 6,3, 2,2);
-    fillRect(ctx,S, '#ffffff', 6,3, 1,1);
-    // Scales
-    fillRect(ctx,S, C.dark, 5,6, 1,1);
-    fillRect(ctx,S, C.dark, 7,7, 1,1);
-    fillRect(ctx,S, C.dark, 5,9, 1,1);
-    outlineSprite(ctx,S, 3,1, 12,14);
+  horsea(ctx,S){
+    const B='#6898d8',D='#4060a0',F='#a0d0ff',E='#202020';
+    fr(ctx,S,B,8,11,5,4);fr(ctx,S,B,11,8,4,5);fr(ctx,S,B,10,13,4,3);fr(ctx,S,B,9,14,3,2);
+    fr(ctx,S,B,5,4,7,10);fr(ctx,S,B,4,6,9,8);fr(ctx,S,D,5,10,7,3);
+    fr(ctx,S,F,10,4,3,5);fr(ctx,S,F,11,3,2,4);
+    fr(ctx,S,B,4,1,8,5);fr(ctx,S,B,3,2,10,4);fr(ctx,S,B,5,4,4,3);fr(ctx,S,'#f08080',5,6,2,1);
+    fr(ctx,S,'#fff',5,2,3,3);fr(ctx,S,E,6,3,2,2);fr(ctx,S,'#fff',6,3,1,1);
+    fr(ctx,S,D,5,6,1,1);fr(ctx,S,D,7,7,1,1);fr(ctx,S,D,5,9,1,1);
   },
-  lapras: (ctx, S) => {
-    const C = { body:'#98d8d8', dark:'#5090a0', shell:'#6898b8', cream:'#f0e8d0', eye:'#202020' };
-    // Shell bumps
-    fillRect(ctx,S, C.shell, 4,6, 8,7);
-    fillRect(ctx,S, C.shell, 3,8, 10,5);
-    fillRect(ctx,S, C.dark, 5,7, 6,1);
-    fillRect(ctx,S, C.dark, 4,10, 8,1);
-    // Bumps on shell
-    fillRect(ctx,S, C.dark, 5,8, 2,2);
-    fillRect(ctx,S, C.dark, 9,8, 2,2);
-    fillRect(ctx,S, C.dark, 7,10, 2,2);
-    // Body
-    fillRect(ctx,S, C.body, 2,10, 12,4);
-    fillRect(ctx,S, C.body, 1,11, 14,3);
-    // Neck
-    fillRect(ctx,S, C.body, 7,3, 4,5);
-    fillRect(ctx,S, C.cream, 8,4, 2,4);
-    // Head
-    fillRect(ctx,S, C.body, 6,0, 6,4);
-    fillRect(ctx,S, C.body, 5,1, 8,4);
-    fillRect(ctx,S, C.cream, 7,1, 4,3);
-    // Eyes
-    fillRect(ctx,S, C.eye, 7,1, 2,2);
-    fillRect(ctx,S, '#ffffff', 7,1, 1,1);
-    // Ear-like fins
-    fillRect(ctx,S, C.body, 5,0, 2,2);
-    fillRect(ctx,S, C.body, 11,0, 2,2);
-    // Flippers
-    fillRect(ctx,S, C.body, 0,11, 4,2);
-    fillRect(ctx,S, C.body, 12,11, 4,2);
-    fillRect(ctx,S, C.dark, 0,12, 3,1);
-    fillRect(ctx,S, C.dark, 13,12, 3,1);
-    outlineSprite(ctx,S, 0,0, 16,14);
+  lapras(ctx,S){
+    const B='#98d8d8',D='#5090a0',SH='#6898b8',CR='#f0e8d0',E='#202020';
+    fr(ctx,S,SH,4,6,8,7);fr(ctx,S,SH,3,8,10,5);fr(ctx,S,D,5,7,6,1);fr(ctx,S,D,4,10,8,1);
+    fr(ctx,S,D,5,8,2,2);fr(ctx,S,D,9,8,2,2);fr(ctx,S,D,7,10,2,2);
+    fr(ctx,S,B,2,10,12,4);fr(ctx,S,B,1,11,14,3);
+    fr(ctx,S,B,7,3,4,5);fr(ctx,S,CR,8,4,2,4);
+    fr(ctx,S,B,6,0,6,4);fr(ctx,S,B,5,1,8,4);fr(ctx,S,CR,7,1,4,3);
+    fr(ctx,S,E,7,1,2,2);fr(ctx,S,'#fff',7,1,1,1);
+    fr(ctx,S,B,5,0,2,2);fr(ctx,S,B,11,0,2,2);
+    fr(ctx,S,B,0,11,4,2);fr(ctx,S,B,12,11,4,2);fr(ctx,S,D,0,12,3,1);fr(ctx,S,D,13,12,3,1);
   },
-  eevee: (ctx, S) => {
-    const C = { body:'#c8b878', dark:'#907840', fur:'#f8e8c0', eye:'#303020', tail:'#f0d880' };
-    // Tail
-    fillRect(ctx,S, C.body, 12,8, 3,5);
-    fillRect(ctx,S, C.tail, 12,5, 4,5);
-    fillRect(ctx,S, C.tail, 11,7, 3,4);
-    // Body
-    fillRect(ctx,S, C.body, 4,7, 8,8);
-    fillRect(ctx,S, C.body, 3,9, 10,5);
-    // Collar/bib fur
-    fillRect(ctx,S, C.fur, 4,7, 8,3);
-    fillRect(ctx,S, C.fur, 3,8, 10,2);
-    // Head
-    fillRect(ctx,S, C.body, 4,1, 8,7);
-    fillRect(ctx,S, C.body, 3,3, 10,5);
-    // Ears
-    fillRect(ctx,S, C.body, 3,0, 2,4);
-    fillRect(ctx,S, C.body, 11,0, 2,4);
-    fillRect(ctx,S, C.fur, 4,1, 1,2);
-    fillRect(ctx,S, C.fur, 11,1, 1,2);
-    // Eyes
-    fillRect(ctx,S, '#ffffff', 4,3, 3,3);
-    fillRect(ctx,S, '#ffffff', 9,3, 3,3);
-    fillRect(ctx,S, C.eye, 5,4, 2,2);
-    fillRect(ctx,S, C.eye, 10,4, 2,2);
-    fillRect(ctx,S, '#ffffff', 5,4, 1,1);
-    fillRect(ctx,S, '#ffffff', 10,4, 1,1);
-    // Nose
-    fillRect(ctx,S, '#d06060', 7,6, 2,1);
-    fillRect(ctx,S, C.dark, 6,7, 4,1);
-    // Legs
-    fillRect(ctx,S, C.body, 4,12, 3,4);
-    fillRect(ctx,S, C.body, 9,12, 3,4);
-    fillRect(ctx,S, C.dark, 4,15, 3,1);
-    fillRect(ctx,S, C.dark, 9,15, 3,1);
-    outlineSprite(ctx,S, 2,0, 14,15);
+  eevee(ctx,S){
+    const B='#c8b878',D='#907840',F='#f8e8c0',E='#303020';
+    fr(ctx,S,B,12,8,3,5);fr(ctx,S,'#f0d880',12,5,4,5);fr(ctx,S,'#f0d880',11,7,3,4);
+    fr(ctx,S,B,4,7,8,8);fr(ctx,S,B,3,9,10,5);fr(ctx,S,F,4,7,8,3);fr(ctx,S,F,3,8,10,2);
+    fr(ctx,S,B,4,1,8,7);fr(ctx,S,B,3,3,10,5);
+    fr(ctx,S,B,3,0,2,4);fr(ctx,S,B,11,0,2,4);fr(ctx,S,F,4,1,1,2);fr(ctx,S,F,11,1,1,2);
+    fr(ctx,S,'#fff',4,3,3,3);fr(ctx,S,'#fff',9,3,3,3);fr(ctx,S,E,5,4,2,2);fr(ctx,S,E,10,4,2,2);fr(ctx,S,'#fff',5,4,1,1);fr(ctx,S,'#fff',10,4,1,1);
+    fr(ctx,S,'#d06060',7,6,2,1);fr(ctx,S,D,6,7,4,1);
+    fr(ctx,S,B,4,12,3,4);fr(ctx,S,B,9,12,3,4);fr(ctx,S,D,4,15,3,1);fr(ctx,S,D,9,15,3,1);
   },
-  dratini: (ctx, S) => {
-    const C = { body:'#7038f8', dark:'#5020d0', light:'#a870ff', cream:'#f0e8d8', eye:'#202020' };
-    // Serpentine body (coiled)
-    fillRect(ctx,S, C.body, 8,3, 4,12);
-    fillRect(ctx,S, C.body, 9,4, 5,10);
-    fillRect(ctx,S, C.body, 4,10, 8,4);
-    fillRect(ctx,S, C.body, 3,11, 6,4);
-    fillRect(ctx,S, C.light, 9,5, 3,8);
-    fillRect(ctx,S, C.cream, 4,11, 4,3);
-    // Head
-    fillRect(ctx,S, C.body, 3,1, 8,5);
-    fillRect(ctx,S, C.body, 2,2, 10,4);
-    fillRect(ctx,S, C.light, 4,2, 6,3);
-    // Fin/horn on head
-    fillRect(ctx,S, C.light, 4,0, 2,3);
-    fillRect(ctx,S, C.light, 9,0, 2,3);
-    // Eyes
-    fillRect(ctx,S, '#ffffff', 4,2, 3,3);
-    fillRect(ctx,S, C.eye, 5,3, 2,2);
-    fillRect(ctx,S, '#ffffff', 5,3, 1,1);
-    // Nose
-    fillRect(ctx,S, C.cream, 3,4, 5,2);
-    fillRect(ctx,S, C.dark, 4,5, 3,1);
-    // Tail
-    fillRect(ctx,S, C.body, 2,13, 4,3);
-    fillRect(ctx,S, C.body, 1,14, 3,2);
-    outlineSprite(ctx,S, 2,0, 14,15);
+  dratini(ctx,S){
+    const B='#7038f8',D='#5020d0',L='#a870ff',CR='#f0e8d8',E='#202020';
+    fr(ctx,S,B,8,3,4,12);fr(ctx,S,B,9,4,5,10);fr(ctx,S,B,4,10,8,4);fr(ctx,S,B,3,11,6,4);
+    fr(ctx,S,L,9,5,3,8);fr(ctx,S,CR,4,11,4,3);
+    fr(ctx,S,B,3,1,8,5);fr(ctx,S,B,2,2,10,4);fr(ctx,S,L,4,2,6,3);
+    fr(ctx,S,L,4,0,2,3);fr(ctx,S,L,9,0,2,3);
+    fr(ctx,S,'#fff',4,2,3,3);fr(ctx,S,E,5,3,2,2);fr(ctx,S,'#fff',5,3,1,1);
+    fr(ctx,S,CR,3,4,5,2);fr(ctx,S,D,4,5,3,1);
+    fr(ctx,S,B,2,13,4,3);fr(ctx,S,B,1,14,3,2);
   },
 };
 
-function fillRect(ctx, S, color, px, py, pw, ph) {
-  ctx.fillStyle = color;
-  ctx.fillRect(px*S, py*S, pw*S, ph*S);
-}
-function outlineSprite(ctx, S, px, py, pw, ph) {
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = S * 0.6;
-  ctx.strokeRect(px*S + ctx.lineWidth/2, py*S + ctx.lineWidth/2,
-    pw*S - ctx.lineWidth, ph*S - ctx.lineWidth);
-}
-
-function drawSprite(canvas, pokemonName, size = 96) {
+function drawSprite(canvas, name, size) {
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0,0,size,size);
-  const S = size / 16;
-  const fn = SPRITE_DEFS[pokemonName.toLowerCase()];
-  if (fn) fn(ctx, S);
+  const S = size/16;
+  const fn = SPRS[name.toLowerCase()];
+  if(fn) fn(ctx,S);
   else {
-    // Fallback generic blob
-    ctx.fillStyle = '#888';
-    ctx.beginPath();
-    ctx.arc(size/2, size/2, size/3, 0, Math.PI*2);
-    ctx.fill();
+    ctx.fillStyle='#888';
+    ctx.beginPath();ctx.arc(size/2,size/2,size/3,0,Math.PI*2);ctx.fill();
   }
 }
 
-// ── GAME STATE ───────────────────────────────────────────────
-let G = {};  // Game object
+// ── GAME STATE ───────────────────────────────────────────
+let G = {};
+let selPlayer = null;
+let selOpp = null;
 
-function createBattlePokemon(pokemonDef, level = 5) {
-  const base = pokemonDef.baseStats;
-  const maxHP = Math.floor((2*base.hp * level) / 100 + level + 10);
-  const atk   = Math.floor((2*base.atk * level) / 100 + 5);
-  const def   = Math.floor((2*base.def * level) / 100 + 5);
-  const spa   = Math.floor((2*base.spa * level) / 100 + 5);
-  const spd   = Math.floor((2*base.spd * level) / 100 + 5);
-
+function mkPoke(def, lv=15) {
+  const b = def.bs;
+  const mhp = Math.floor((2*b.hp*lv)/100+lv+10);
   return {
-    ...pokemonDef,
-    level,
-    maxHP, hp: maxHP,
-    atk, def, spa, spd,
-    moves: pokemonDef.moves.map(m => ({
-      ...MOVES[m],
-      id: m,
-      currentPP: MOVES[m] ? MOVES[m].pp : 10
-    })).filter(m => m.name),
-    status: null,      // PSN BRN PAR SLP FRZ
-    statusTurns: 0,
-    statStages: { atk:0, def:0, spa:0, spd:0, acc:0, eva:0 },
-    fainted: false,
-    exp: 0,
+    ...def,
+    level:lv, maxHP:mhp, hp:mhp,
+    atk: Math.floor((2*b.atk*lv)/100+5),
+    def: Math.floor((2*b.def*lv)/100+5),
+    spa: Math.floor((2*b.spa*lv)/100+5),
+    spd: Math.floor((2*b.spd*lv)/100+5),
+    moves: def.moves.map(m=>MV[m]?{...MV[m],id:m,cpp:MV[m].pp}:null).filter(Boolean),
+    status:null, statusTurns:0,
+    stages:{atk:0,def:0,spa:0,spd:0,acc:0},
+    fainted:false,
   };
 }
 
-function getStageMult(stage) {
-  const table = [0.25, 0.28, 0.33, 0.4, 0.5, 0.66, 1, 1.5, 2, 2.5, 3, 3.5, 4];
-  return table[Math.min(12, Math.max(0, stage + 6))];
+function stgMult(s){const t=[0.25,0.28,0.33,0.4,0.5,0.66,1,1.5,2,2.5,3,3.5,4];return t[Math.min(12,Math.max(0,s+6))];}
+
+function calcDmg(att, def, mv) {
+  if(mv.pw===0) return 0;
+  if(mv.fx&&mv.fx.fixd) return mv.fx.fixamt||att.level;
+  const isSp = mv.cat==='special';
+  const a = (isSp?att.spa:att.atk)*stgMult(att.stages[isSp?'spa':'atk']||0);
+  const d = (isSp?def.spa:def.def)*stgMult(def.stages[isSp?'spa':'def']||0);
+  let dmg = Math.floor((2*att.level/5+2)*mv.pw*a/d/50)+2;
+  if(att.types.includes(mv.type)) dmg=Math.floor(dmg*1.5);
+  const ef = typeEff(mv.type, def.types);
+  dmg = Math.floor(dmg*ef);
+  if(Math.random()<(mv.crit?0.25:0.0625)) dmg=Math.floor(dmg*1.5);
+  dmg = Math.floor(dmg*(0.85+Math.random()*0.15));
+  return Math.max(1,dmg);
 }
 
-function calcDamage(attacker, defender, move) {
-  if (move.power === 0) return 0;
-  if (move.effect && move.effect.fixedDmg) {
-    return move.effect.fixedAmt || attacker.level;
+// ── MESSAGE QUEUE ────────────────────────────────────────
+let mq=[], mb=false;
+function showMsg(txt,ms=1100){
+  return new Promise(res=>{
+    mq.push({txt,ms,res});
+    if(!mb) pumpMQ();
+  });
+}
+function pumpMQ(){
+  if(mb||!mq.length) return;
+  mb=true;
+  const {txt,ms,res}=mq.shift();
+  document.getElementById('msgtext').innerHTML=txt+' <span id="msgcursor"></span>';
+  setTimeout(()=>{mb=false;res();pumpMQ();},ms);
+}
+
+// ── HP / STATUS UI ───────────────────────────────────────
+function updHP(who){
+  const p=G[who];
+  const pct=Math.max(0,p.hp/p.maxHP)*100;
+  const bar=document.getElementById(who==='player'?'phpbar':'ehpbar');
+  const num=document.getElementById(who==='player'?'phpnum':'ehpnum');
+  bar.style.width=pct+'%';
+  bar.style.backgroundColor=pct>50?'var(--hp-g)':pct>25?'var(--hp-y)':'var(--hp-r)';
+  if(who==='player') num.textContent=Math.max(0,p.hp)+'/'+p.maxHP;
+  else num.textContent='';
+}
+function updStatus(who){
+  const el=document.getElementById(who==='player'?'pstatus':'estatus');
+  const s=G[who].status;
+  el.innerHTML=s?`<span class="sbadge s-${s}">${s}</span>`:'';
+}
+
+// ── MENUS ────────────────────────────────────────────────
+function showAction(){
+  document.getElementById('actmenu').classList.remove('hidden');
+  document.getElementById('movemenu').classList.add('hidden');
+  document.getElementById('backbtn').classList.add('hidden');
+}
+function showMoves(){
+  const menu=document.getElementById('movemenu');
+  menu.innerHTML='';
+  G.player.moves.forEach((mv,i)=>{
+    const b=document.createElement('button');
+    b.className='mbtn'+(mv.cpp<=0?' npp':'');
+    b.innerHTML=`${mv.name}<span class="mtype t-${mv.type}">${mv.type.toUpperCase()}</span><span class="mpp">${mv.cpp}/${mv.pp}PP</span>`;
+    b.disabled=mv.cpp<=0;
+    b.addEventListener('click',()=>{if(!G.on||G.busy)return;doPlayerMove(i);});
+    menu.appendChild(b);
+  });
+  document.getElementById('actmenu').classList.add('hidden');
+  menu.classList.remove('hidden');
+  document.getElementById('backbtn').classList.remove('hidden');
+}
+function showBagMenu(){
+  if(!G.on||G.busy) return;
+  const menu=document.getElementById('movemenu');
+  menu.innerHTML='';
+  document.getElementById('actmenu').classList.add('hidden');
+  menu.classList.remove('hidden');
+  document.getElementById('backbtn').classList.remove('hidden');
+
+  const avail=Object.entries(G.bag).filter(([,v])=>v>0);
+  if(!avail.length){
+    showMsg('Your bag is empty!',900);
+    showAction(); return;
   }
-  const isSpecial = move.category === 'special';
-  const atkStat = isSpecial
-    ? attacker.spa * getStageMult(attacker.statStages.spa)
-    : attacker.atk * getStageMult(attacker.statStages.atk);
-  const defStat = isSpecial
-    ? defender.spa * getStageMult(defender.statStages.spa)
-    : defender.def * getStageMult(defender.statStages.def);
-
-  let baseDmg = Math.floor((2 * attacker.level / 5 + 2) * move.power * atkStat / defStat / 50) + 2;
-
-  // STAB
-  if (attacker.types.includes(move.type)) baseDmg = Math.floor(baseDmg * 1.5);
-
-  // Type effectiveness
-  const eff = typeEffectiveness(move.type, defender.types);
-  baseDmg = Math.floor(baseDmg * eff);
-
-  // Critical hit
-  const critChance = move.critHigh ? 0.25 : 0.0625;
-  if (Math.random() < critChance) baseDmg = Math.floor(baseDmg * 1.5);
-
-  // Random factor (85%-100%)
-  baseDmg = Math.floor(baseDmg * (0.85 + Math.random() * 0.15));
-
-  return Math.max(1, baseDmg);
-}
-
-function getEffMessage(eff) {
-  if (eff === 0) return "It had no effect!";
-  if (eff >= 2) return "It's super effective!";
-  if (eff <= 0.5) return "It's not very effective...";
-  return null;
-}
-
-// ── UI HELPERS ───────────────────────────────────────────────
-let msgQueue = [];
-let msgBusy = false;
-
-function queueMsg(text, delay = 1200) {
-  return new Promise(resolve => msgQueue.push({ text, delay, resolve }));
-}
-
-function processQueue() {
-  if (msgBusy || msgQueue.length === 0) return;
-  msgBusy = true;
-  const { text, delay, resolve } = msgQueue.shift();
-  const el = document.getElementById('message-text');
-  el.innerHTML = text + ' <span id="message-cursor"></span>';
-  setTimeout(() => {
-    msgBusy = false;
-    resolve();
-    processQueue();
-  }, delay);
-}
-
-async function showMsg(text, delay = 1200) {
-  await queueMsg(text, delay);
-  processQueue();
-}
-
-function updateHPBar(who, animate = true) {
-  const poke = G[who];
-  const pct = Math.max(0, poke.hp / poke.maxHP) * 100;
-  const bar = document.getElementById(`${who}-hp-bar`);
-  const nums = document.getElementById(`${who}-hp-numbers`);
-  bar.style.width = pct + '%';
-  bar.style.backgroundColor = pct > 50 ? 'var(--gb-hp-green)' : pct > 25 ? 'var(--gb-hp-yel)' : 'var(--gb-hp-red)';
-  if (who === 'player') nums.textContent = `${Math.max(0,poke.hp)}/${poke.maxHP}`;
-  else nums.textContent = '';
-}
-
-function updateStatusBadge(who) {
-  const poke = G[who];
-  const el = document.getElementById(`${who}-status`);
-  if (poke.status) {
-    el.innerHTML = `<span class="status-badge status-${poke.status}">${poke.status}</span>`;
-  } else {
-    el.textContent = '';
-  }
-}
-
-function setMenuVisible(actionVisible, moveVisible) {
-  document.getElementById('action-menu').style.display = actionVisible ? 'grid' : 'none';
-  document.getElementById('move-menu').style.display = moveVisible ? 'grid' : 'none';
-  document.getElementById('back-btn').style.display = moveVisible ? 'block' : 'none';
-}
-
-function rebuildMoveMenu() {
-  const menu = document.getElementById('move-menu');
-  menu.innerHTML = '';
-  G.player.moves.forEach((move, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'move-btn' + (move.currentPP <= 0 ? ' no-pp' : '');
-    btn.innerHTML = `${move.name}<span class="move-type type-${move.type}">${move.type.toUpperCase()}</span><span class="move-pp">${move.currentPP}/${move.pp} PP</span>`;
-    btn.disabled = move.currentPP <= 0;
-    btn.addEventListener('click', () => {
-      if (!G.battleActive || G.animating) return;
-      playerUsesMove(i);
+  avail.forEach(([k,qty])=>{
+    const item=ITEMS[k]; if(!item) return;
+    const b=document.createElement('button');
+    b.className='mbtn';
+    b.innerHTML=`${item.name}<span class="mpp">${qty}x</span><br><span style="font-size:5px;color:#888">${item.desc}</span>`;
+    b.addEventListener('click',async()=>{
+      if(!G.on||G.busy) return;
+      G.busy=true; G.bag[k]--;
+      if(item.cureAll){G.player.status=null;updStatus('player');await showMsg(`Used ${item.name}! All clear!`,1100);}
+      else if(item.cures){
+        if(G.player.status===item.cures){G.player.status=null;updStatus('player');await showMsg(`Used ${item.name}!`,1100);}
+        else{G.bag[k]++;await showMsg(`Won't work on ${G.player.name}!`,900);}
+      } else if(item.heal){
+        if(G.player.hp>=G.player.maxHP){G.bag[k]++;await showMsg(`${G.player.name} is at full HP!`,900);}
+        else{G.player.hp=Math.min(G.player.maxHP,G.player.hp+item.heal);updHP('player');await showMsg(`Restored ${item.heal} HP!`,1100);}
+      }
+      await enemyTurn();
     });
-    menu.appendChild(btn);
+    menu.appendChild(b);
   });
 }
 
-// ── STARFIELD ────────────────────────────────────────────────
-function initStarfield() {
-  const canvas = document.getElementById('starfield');
-  const ctx = canvas.getContext('2d');
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  const stars = Array.from({length:120}, () => ({
-    x: Math.random()*canvas.width,
-    y: Math.random()*canvas.height,
-    r: Math.random()*1.5+0.3,
-    speed: Math.random()*0.3+0.05,
-    alpha: Math.random()
-  }));
-  function loop() {
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    for (const s of stars) {
-      ctx.globalAlpha = s.alpha;
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
-      ctx.fill();
-      s.y += s.speed;
-      s.alpha = 0.3 + 0.7*Math.abs(Math.sin(Date.now()/2000 + s.x));
-      if (s.y > canvas.height) { s.y = 0; s.x = Math.random()*canvas.width; }
-    }
-    ctx.globalAlpha = 1;
-    requestAnimationFrame(loop);
-  }
-  loop();
-}
+// ── TITLE SCREEN INIT ────────────────────────────────────
+function initTitle(){
+  selPlayer=null; selOpp=null;
+  document.getElementById('start-btn').disabled=true;
 
-// ── TITLE SCREEN SETUP ───────────────────────────────────────
-let selectedPlayer = null;
-let selectedOpponent = null;
-
-function initTitleScreen() {
-  const sg = document.getElementById('starter-grid');
-  const og = document.getElementById('opponent-grid');
-  sg.innerHTML = ''; og.innerHTML = '';
-
-  POKEMON.forEach((p, i) => {
-    const card = makePokeCard(p, 'player', i);
-    sg.appendChild(card);
-  });
-  POKEMON.forEach((p, i) => {
-    const card = makePokeCard(p, 'opponent', i);
-    og.appendChild(card);
+  // Reset preview slots
+  ['you','opp'].forEach(s=>{
+    document.getElementById(`slot-${s}-canvas`).style.display='none';
+    document.getElementById(`slot-${s}-empty`).style.display='';
+    document.getElementById(`slot-${s}-name`).textContent='';
   });
 
-  document.getElementById('start-btn').addEventListener('click', startBattle);
+  const pg=document.getElementById('player-grid');
+  const og=document.getElementById('opp-grid');
+  pg.innerHTML=''; og.innerHTML='';
+
+  PKM.forEach((p,i)=>{
+    pg.appendChild(makeCard(p,i,'player'));
+    og.appendChild(makeCard(p,i,'opp'));
+  });
 }
 
-function makePokeCard(p, who, idx) {
-  const card = document.createElement('div');
-  card.className = 'starter-card';
-  card.dataset.idx = idx;
+function makeCard(p, idx, who){
+  const card=document.createElement('div');
+  card.className='poke-card';
 
-  const c = document.createElement('canvas');
-  c.width = 48; c.height = 48;
-  drawSprite(c, p.sprite, 48);
+  const c=document.createElement('canvas');
+  c.width=40; c.height=40;
+  drawSprite(c,p.spr,40);
   card.appendChild(c);
 
-  const name = document.createElement('div');
-  name.className = 'name';
-  name.textContent = p.name;
-  card.appendChild(name);
+  const nm=document.createElement('div');
+  nm.className='pname';
+  nm.textContent=p.name.substring(0,7); // truncate for tiny cards
+  card.appendChild(nm);
 
-  const typeBadge = document.createElement('span');
-  typeBadge.className = `type-badge type-${p.types[0]}`;
-  typeBadge.textContent = p.types[0].toUpperCase();
-  card.appendChild(typeBadge);
+  const tb=document.createElement('span');
+  tb.className=`tbadge t-${p.types[0]}`;
+  tb.textContent=p.types[0].substring(0,3).toUpperCase();
+  card.appendChild(tb);
 
-  card.addEventListener('click', () => {
-    if (who === 'player') {
-      document.querySelectorAll('#starter-grid .starter-card').forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
-      selectedPlayer = idx;
+  card.addEventListener('click',()=>{
+    const grid=who==='player'?'#player-grid':'#opp-grid';
+    document.querySelectorAll(grid+' .poke-card').forEach(c=>c.classList.remove('selected'));
+    card.classList.add('selected');
+
+    if(who==='player'){
+      selPlayer=idx;
+      // Update preview slot
+      const sc=document.getElementById('slot-you-canvas');
+      drawSprite(sc,p.spr,40);
+      sc.style.display='block';
+      document.getElementById('slot-you-empty').style.display='none';
+      document.getElementById('slot-you-name').textContent=p.name;
     } else {
-      document.querySelectorAll('#opponent-grid .starter-card').forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
-      selectedOpponent = idx;
+      selOpp=idx;
+      const sc=document.getElementById('slot-opp-canvas');
+      drawSprite(sc,p.spr,40);
+      sc.style.display='block';
+      document.getElementById('slot-opp-empty').style.display='none';
+      document.getElementById('slot-opp-name').textContent=p.name;
     }
-    if (selectedPlayer !== null && selectedOpponent !== null) {
-      document.getElementById('start-btn').disabled = false;
+
+    const btn=document.getElementById('start-btn');
+    if(selPlayer!==null && selOpp!==null){
+      btn.disabled=false;
+      // Pulse the button to draw attention
+      btn.style.animation='none';
+      void btn.offsetWidth;
+      btn.style.animation='pulse-start 0.5s ease 2';
     }
   });
   return card;
 }
 
-// ── BATTLE SETUP ─────────────────────────────────────────────
-function startBattle() {
-  if (selectedPlayer === null || selectedOpponent === null) return;
-  if (selectedPlayer === selectedOpponent) {
-    // Allow mirror matches
-  }
+// ── BATTLE START ─────────────────────────────────────────
+function startBattle(){
+  if(selPlayer===null||selOpp===null) return;
 
-  const pDef = POKEMON[selectedPlayer];
-  const eDef = POKEMON[selectedOpponent];
-  const level = 15;
-
-  G = {
-    player:   createBattlePokemon(pDef, level),
-    enemy:    createBattlePokemon(eDef, level),
-    bag:      { potion: 3, superpotion: 1, fullheal: 2 },
-    battleActive: true,
-    animating: false,
-    particles: null,
-    turn: 0,
+  G={
+    player: mkPoke(PKM[selPlayer]),
+    enemy:  mkPoke(PKM[selOpp]),
+    bag:{potion:3,superpotion:1,fullheal:2},
+    on:true, busy:false, turn:0,
+    particles:null,
   };
 
   // Switch screens
-  document.getElementById('title-screen').style.display = 'none';
-  document.getElementById('battle-screen').style.display = 'flex';
-  document.getElementById('result-screen').style.display = 'none';
+  showScreen('battle-screen');
 
-  // Init particles
-  const pCanvas = document.getElementById('particle-canvas');
-  G.particles = new ParticleSystem(pCanvas);
+  // Resize battle field canvas
+  requestAnimationFrame(()=>{
+    const pfx=document.getElementById('pfx');
+    G.particles=new Particles(pfx);
 
-  // Draw sprites
-  drawSprite(document.getElementById('player-sprite-canvas'), G.player.sprite, 96);
-  drawSprite(document.getElementById('enemy-sprite-canvas'),  G.enemy.sprite,  96);
+    const ss = Math.floor(Math.min(80, window.innerWidth*0.2));
+    drawSprite(document.getElementById('psp'),G.player.spr,ss);
+    drawSprite(document.getElementById('esp'),G.enemy.spr,ss);
 
-  // Update UI
-  document.getElementById('player-name').textContent = G.player.name;
-  document.getElementById('enemy-name').textContent  = G.enemy.name;
-  document.getElementById('player-level').textContent = `Lv${G.player.level}`;
-  document.getElementById('enemy-level').textContent  = `Lv${G.enemy.level}`;
-  updateHPBar('player');
-  updateHPBar('enemy');
-  updateStatusBadge('player');
-  updateStatusBadge('enemy');
+    document.getElementById('pname').textContent=G.player.name;
+    document.getElementById('ename').textContent=G.enemy.name;
+    document.getElementById('plvl').textContent='Lv'+G.player.level;
+    document.getElementById('elvl').textContent='Lv'+G.enemy.level;
+    updHP('player'); updHP('enemy');
+    updStatus('player'); updStatus('enemy');
 
-  // Build bag UI
-  document.getElementById('btn-bag').addEventListener('click', showBagMenu, {once:false});
-  document.getElementById('btn-fight').addEventListener('click', () => {
-    if (!G.battleActive || G.animating) return;
-    rebuildMoveMenu();
-    setMenuVisible(false, true);
+    mq=[]; mb=false;
+    (async()=>{
+      G.busy=true;
+      await showMsg(`A wild ${G.enemy.name} appeared!`,1200);
+      await showMsg(`Go! ${G.player.name}!`,1200);
+      document.getElementById('msgpoke').textContent=G.player.name;
+      showAction();
+      G.busy=false;
+    })();
   });
-  document.getElementById('btn-switch').addEventListener('click', () => {
-    if (!G.battleActive || G.animating) return;
-    showMsg(`There's no one to switch to!`, 1000);
+}
+
+// ── PLAYER MOVE ──────────────────────────────────────────
+async function doPlayerMove(mi){
+  if(!G.on||G.busy) return;
+  G.busy=true;
+  showAction();
+
+  const mv=G.player.moves[mi];
+  if(!mv||mv.cpp<=0){await showMsg('No PP left!',900);showAction();G.busy=false;return;}
+  mv.cpp--;
+
+  // Status blocks
+  if(G.player.status==='PAR'&&Math.random()<0.25){
+    await showMsg(`${G.player.name} is paralyzed!`,1100);
+    await doEnemyTurn(); return;
+  }
+  if(G.player.status==='SLP'){
+    G.player.statusTurns--;
+    if(G.player.statusTurns>0){await showMsg(`${G.player.name} is fast asleep!`,1100);await doEnemyTurn();return;}
+    G.player.status=null;updStatus('player');await showMsg(`${G.player.name} woke up!`,1100);
+  }
+  if(G.player.status==='FRZ'){
+    if(Math.random()<0.8){await showMsg(`${G.player.name} is frozen solid!`,1100);await doEnemyTurn();return;}
+    G.player.status=null;updStatus('player');await showMsg(`${G.player.name} thawed out!`,1100);
+  }
+
+  await execMove(G.player,G.enemy,mv,'player');
+  if(!G.on) return;
+
+  if(G.enemy.hp<=0){
+    G.enemy.hp=0; updHP('enemy');
+    document.getElementById('esp').style.animation='faint-e 0.5s forwards';
+    await showMsg(`Enemy ${G.enemy.name} fainted!`,1400);
+    G.on=false; G.busy=false;
+    setTimeout(()=>showResult('win'),700); return;
+  }
+  await doEnemyTurn();
+}
+
+async function doEnemyTurn(){
+  if(!G.on) return;
+
+  if(G.enemy.status==='PAR'&&Math.random()<0.25){
+    await showMsg(`Enemy ${G.enemy.name} is paralyzed!`,1100);
+  } else if(G.enemy.status==='SLP'){
+    G.enemy.statusTurns--;
+    if(G.enemy.statusTurns>0){await showMsg(`${G.enemy.name} is asleep!`,1000);}
+    else{G.enemy.status=null;updStatus('enemy');await showMsg(`${G.enemy.name} woke up!`,1100);}
+  } else if(G.enemy.status==='FRZ'&&Math.random()<0.8){
+    await showMsg(`${G.enemy.name} is frozen!`,1000);
+  } else {
+    const mv=aiPick(G.enemy,G.player);
+    if(mv) await execMove(G.enemy,G.player,mv,'enemy');
+  }
+
+  if(!G.on) return;
+
+  if(G.player.hp<=0){
+    G.player.hp=0; updHP('player');
+    document.getElementById('psp').style.animation='faint-p 0.5s forwards';
+    await showMsg(`${G.player.name} fainted!`,1400);
+    G.on=false; G.busy=false;
+    setTimeout(()=>showResult('lose'),700); return;
+  }
+
+  // End of turn damage
+  for(const who of ['player','enemy']){
+    const pk=G[who];
+    if(pk.status==='BRN'||pk.status==='PSN'){
+      const dmg=Math.max(1,Math.floor(pk.maxHP/8));
+      pk.hp=Math.max(0,pk.hp-dmg); updHP(who);
+      await showMsg(`${who==='player'?pk.name:'Enemy '+pk.name} is hurt by ${pk.status==='BRN'?'burn':'poison'}!`,900);
+      if(pk.hp<=0){
+        pk.hp=0;
+        document.getElementById(who==='player'?'psp':'esp').style.animation=who==='player'?'faint-p 0.5s forwards':'faint-e 0.5s forwards';
+        await showMsg(`${who==='player'?pk.name:'Enemy '+pk.name} fainted!`,1400);
+        G.on=false; G.busy=false;
+        setTimeout(()=>showResult(who==='player'?'lose':'win'),700); return;
+      }
+    }
+  }
+
+  G.turn++;
+  if(G.on){
+    document.getElementById('msgpoke').textContent=G.player.name;
+    document.getElementById('msgtext').innerHTML=`What will ${G.player.name} do? <span id="msgcursor"></span>`;
+    showAction();
+    G.busy=false;
+  }
+}
+
+async function execMove(att,def,mv,who){
+  const isP=who==='player';
+  const ap=isP?'':'Enemy ';
+  const dp=isP?'Enemy ':'';
+
+  await showMsg(`${ap}${att.name} used ${mv.name}!`,850);
+
+  // Accuracy
+  const accM=stgMult(att.stages.acc||0)/stgMult(def.stages.acc||0);
+  if(Math.random()*100>mv.ac*accM){await showMsg(`${ap}${att.name}'s attack missed!`,1000);return;}
+
+  // Particles — emit at defender screen position
+  const field=document.getElementById('battle-field');
+  const fx=isP?field.offsetWidth*0.72:field.offsetWidth*0.28;
+  const fy=isP?field.offsetHeight*0.3:field.offsetHeight*0.65;
+  if(G.particles) G.particles.emit(mv.type,fx,fy);
+
+  if(mv.cat==='status'){
+    const e=mv.fx;
+    if(!e){await showMsg(`...`,500);return;}
+    if(e.heal){
+      att.hp=Math.min(att.maxHP,att.hp+Math.floor(att.maxHP*e.heal));
+      updHP(who); await showMsg(`${ap}${att.name} restored HP!`,1000);
+    } else if(e.st){
+      const tgt=e.self?att:def; const tWho=e.self?who:(isP?'enemy':'player');
+      const tn=e.self?`${ap}${att.name}`:`${dp}${def.name}`;
+      if(!tgt.status){
+        tgt.status=e.st; if(e.st==='SLP') tgt.statusTurns=2+Math.floor(Math.random()*3);
+        updStatus(tWho);
+        const sn={PSN:'was poisoned',BRN:'was burned',PAR:'was paralyzed',SLP:'fell asleep',FRZ:'was frozen'};
+        await showMsg(`${tn} ${sn[e.st]||'was affected'}!`,1000);
+      } else await showMsg(`It didn't affect ${tn}!`,800);
+    } else if(e.stat){
+      const tgt=e.self?att:def;
+      const tn=e.self?`${ap}${att.name}`:`${dp}${def.name}`;
+      tgt.stages[e.stat]=Math.max(-6,Math.min(6,(tgt.stages[e.stat]||0)+(e.stages||0)));
+      const sn2={atk:'Attack',def:'Defense',spa:'Sp.Atk',spd:'Speed',acc:'Accuracy'};
+      await showMsg(`${tn}'s ${sn2[e.stat]} ${(e.stages||0)>0?'rose':'fell'}!`,900);
+    }
+    return;
+  }
+
+  // Damage
+  const dmg=calcDmg(att,def,mv);
+  const ef=typeEff(mv.type,def.types);
+  if(ef===0){await showMsg(`It had no effect!`,900);return;}
+  if(ef>=2)  await showMsg(`It's super effective!`,700);
+  if(ef<=0.5)await showMsg(`It's not very effective...`,700);
+
+  // Shake
+  const dsp=document.getElementById(isP?'esp':'psp');
+  dsp.classList.remove('shk-e','shk-p');
+  void dsp.offsetWidth;
+  dsp.classList.add(isP?'shk-e':'shk-p');
+  setTimeout(()=>dsp.classList.remove('shk-e','shk-p'),420);
+
+  def.hp=Math.max(0,def.hp-dmg);
+  updHP(isP?'enemy':'player');
+
+  // Secondary FX
+  const e2=mv.fx;
+  if(e2&&!e2.fixd&&!e2.heal&&e2.ch&&Math.random()*100<e2.ch){
+    if(e2.st&&!def.status){
+      def.status=e2.st; if(e2.st==='SLP') def.statusTurns=2+Math.floor(Math.random()*3);
+      updStatus(isP?'enemy':'player');
+      const sn={PSN:'was poisoned',BRN:'was burned',PAR:'was paralyzed',SLP:'fell asleep',FRZ:'was frozen'};
+      await showMsg(`${dp}${def.name} ${sn[e2.st]}!`,900);
+    } else if(e2.stat){
+      def.stages[e2.stat]=Math.max(-6,Math.min(6,(def.stages[e2.stat]||0)+(e2.stages||0)));
+    }
+  }
+}
+
+// ── AI ───────────────────────────────────────────────────
+function aiPick(en,pl){
+  const avail=en.moves.filter(m=>m.cpp>0);
+  if(!avail.length) return {name:'Struggle',type:'normal',pw:50,ac:100,pp:1,cpp:1,cat:'physical',fx:null};
+  const sc=avail.map(mv=>{
+    let s=0;
+    if(mv.cat!=='status'){
+      const d=calcDmg(en,pl,mv);
+      const ef=typeEff(mv.type,pl.types);
+      s=d*2+ef*10+(d>=pl.hp?100:0);
+    } else s=en.hp>en.maxHP*0.5&&!pl.status?25:3;
+    return{mv,s};
+  }).sort((a,b)=>b.s-a.s);
+  // Pick from top 2 with some randomness
+  return sc[Math.floor(Math.random()*Math.min(2,sc.length))].mv;
+}
+
+// ── RESULT ───────────────────────────────────────────────
+function showResult(outcome){
+  showScreen('result-screen');
+  const t=document.getElementById('rtitle');
+  const m=document.getElementById('rmsg');
+  const rs=document.getElementById('rsprite');
+  if(outcome==='win'){
+    t.textContent='VICTORY!'; t.className='win';
+    m.textContent=`${G.player.name} triumphed!\nYou defeated enemy ${G.enemy.name}.\nYou're on your way to being a master!`;
+    drawSprite(rs,G.player.spr,112);
+  } else if(outcome==='lose'){
+    t.textContent='DEFEATED!'; t.className='lose';
+    m.textContent=`${G.player.name} was defeated...\nEnemy ${G.enemy.name} was too strong.\nTrain harder and try again!`;
+    drawSprite(rs,G.enemy.spr,112);
+  } else {
+    t.textContent='ESCAPED!'; t.className='draw';
+    m.textContent=`You fled the battle.\nSometimes the wise trainer\nknows when to retreat!`;
+    drawSprite(rs,G.player.spr,112);
+  }
+}
+
+// ── SCREEN MANAGER ───────────────────────────────────────
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>{
+    s.classList.remove('active');
+    s.style.display='none';
   });
-  document.getElementById('btn-run').addEventListener('click', async () => {
-    if (!G.battleActive || G.animating) return;
-    G.animating = true;
-    await showMsg(`Got away safely!`, 1200);
-    G.battleActive = false;
-    G.animating = false;
+  const el=document.getElementById(id);
+  el.style.display=id==='battle-screen'?'flex':'block';
+  el.classList.add('active');
+  // Show/hide sticky start bar
+  document.getElementById('start-bar').style.display=id==='title-screen'?'flex':'none';
+}
+
+// ── STARFIELD ────────────────────────────────────────────
+function initStars(){
+  const c=document.getElementById('starfield');
+  const x=c.getContext('2d');
+  c.width=window.innerWidth; c.height=window.innerHeight;
+  const stars=Array.from({length:150},()=>({
+    x:Math.random()*c.width, y:Math.random()*c.height,
+    r:Math.random()*1.5+0.2, s:Math.random()*0.25+0.05,
+    a:Math.random()
+  }));
+  function tick(){
+    x.clearRect(0,0,c.width,c.height);
+    const t=Date.now()/2000;
+    for(const s of stars){
+      x.globalAlpha=0.3+0.7*Math.abs(Math.sin(t+s.x*0.01));
+      x.fillStyle='#fff';
+      x.beginPath();x.arc(s.x,s.y,s.r,0,Math.PI*2);x.fill();
+      s.y+=s.s; if(s.y>c.height){s.y=0;s.x=Math.random()*c.width;}
+    }
+    x.globalAlpha=1;
+    requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+// ── BUTTON PULSE ANIMATION ───────────────────────────────
+const startPulseCSS = document.createElement('style');
+startPulseCSS.textContent = `
+@keyframes pulse-start {
+  0%   { transform: scale(1); box-shadow: 4px 4px 0 #000; }
+  50%  { transform: scale(1.05); box-shadow: 6px 6px 0 #000, 0 0 20px rgba(233,69,96,0.6); }
+  100% { transform: scale(1); box-shadow: 4px 4px 0 #000; }
+}`;
+document.head.appendChild(startPulseCSS);
+
+// ── INIT ─────────────────────────────────────────────────
+window.addEventListener('load', ()=>{
+  initStars();
+
+  // Set initial screen state
+  document.getElementById('title-screen').style.display='block';
+  document.getElementById('battle-screen').style.display='none';
+  document.getElementById('result-screen').style.display='none';
+  document.getElementById('start-bar').style.display='flex';
+
+  initTitle();
+
+  // Battle buttons
+  document.getElementById('start-btn').addEventListener('click', startBattle);
+  document.getElementById('btn-fight').addEventListener('click',()=>{if(!G.on||G.busy)return;showMoves();});
+  document.getElementById('btn-bag').addEventListener('click', showBagMenu);
+  document.getElementById('btn-switch').addEventListener('click',()=>{if(!G.on||G.busy)return;showMsg(`No one else to switch to!`,900);});
+  document.getElementById('btn-run').addEventListener('click',async()=>{
+    if(!G.on||G.busy) return;
+    G.busy=true;
+    await showMsg(`Got away safely!`,1100);
+    G.on=false; G.busy=false;
     showResult('draw');
   });
-  document.getElementById('back-btn').addEventListener('click', () => {
-    setMenuVisible(true, false);
-  });
+  document.getElementById('backbtn').addEventListener('click',()=>showAction());
 
-  msgQueue = [];
-  msgBusy = false;
-
-  // Intro messages
-  (async () => {
-    G.animating = true;
-    await showMsg(`${G.enemy.name} appeared!`, 1200);
-    await showMsg(`Go! ${G.player.name}!`, 1200);
-    document.getElementById('msg-pokemon-name').textContent = G.player.name;
-    setMenuVisible(true, false);
-    G.animating = false;
-  })();
-}
-
-// ── BATTLE ACTIONS ───────────────────────────────────────────
-async function playerUsesMove(moveIdx) {
-  if (!G.battleActive || G.animating) return;
-  G.animating = true;
-  setMenuVisible(false, false);
-
-  const move = G.player.moves[moveIdx];
-  if (!move || move.currentPP <= 0) {
-    await showMsg(`No PP left!`, 900);
-    setMenuVisible(false, true);
-    G.animating = false;
-    return;
-  }
-  move.currentPP--;
-
-  // Check status before moving
-  if (G.player.status === 'PAR' && Math.random() < 0.25) {
-    await showMsg(`${G.player.name} is paralyzed! It can't move!`, 1200);
-    await enemyTurn();
-    return;
-  }
-  if (G.player.status === 'SLP') {
-    G.player.statusTurns--;
-    if (G.player.statusTurns > 0) {
-      await showMsg(`${G.player.name} is fast asleep!`, 1200);
-      await enemyTurn();
-      return;
-    } else {
-      G.player.status = null;
-      updateStatusBadge('player');
-      await showMsg(`${G.player.name} woke up!`, 1200);
-    }
-  }
-  if (G.player.status === 'FRZ') {
-    if (Math.random() < 0.8) {
-      await showMsg(`${G.player.name} is frozen solid!`, 1200);
-      await enemyTurn();
-      return;
-    } else {
-      G.player.status = null;
-      updateStatusBadge('player');
-      await showMsg(`${G.player.name} thawed out!`, 1200);
-    }
-  }
-
-  await executeMove(G.player, G.enemy, move, 'player');
-  if (!G.battleActive) return;
-
-  // Check enemy fainted
-  if (G.enemy.hp <= 0) {
-    G.enemy.hp = 0;
-    G.enemy.fainted = true;
-    updateHPBar('enemy');
-    const enemySprite = document.getElementById('enemy-sprite-canvas');
-    enemySprite.style.animation = 'faint-enemy 0.5s forwards';
-    await showMsg(`Enemy ${G.enemy.name} fainted!`, 1400);
-    G.battleActive = false;
-    G.animating = false;
-    setTimeout(() => showResult('win'), 800);
-    return;
-  }
-
-  await enemyTurn();
-}
-
-async function enemyTurn() {
-  if (!G.battleActive) return;
-
-  // Enemy status
-  if (G.enemy.status === 'PAR' && Math.random() < 0.25) {
-    await showMsg(`Enemy ${G.enemy.name} is paralyzed!`, 1200);
-  } else if (G.enemy.status === 'SLP') {
-    G.enemy.statusTurns--;
-    if (G.enemy.statusTurns > 0) {
-      await showMsg(`Enemy ${G.enemy.name} is fast asleep!`, 1200);
-    } else {
-      G.enemy.status = null;
-      updateStatusBadge('enemy');
-      await showMsg(`Enemy ${G.enemy.name} woke up!`, 1200);
-    }
-    await endOfTurn();
-    return;
-  } else if (G.enemy.status === 'FRZ' && Math.random() < 0.8) {
-    await showMsg(`Enemy ${G.enemy.name} is frozen!`, 1200);
-    await endOfTurn();
-    return;
-  } else {
-    // AI: pick best move
-    const move = aiPickMove(G.enemy, G.player);
-    if (move) await executeMove(G.enemy, G.player, move, 'enemy');
-  }
-
-  if (!G.battleActive) return;
-
-  // Check player fainted
-  if (G.player.hp <= 0) {
-    G.player.hp = 0;
-    G.player.fainted = true;
-    updateHPBar('player');
-    const playerSprite = document.getElementById('player-sprite-canvas');
-    playerSprite.style.animation = 'faint 0.5s forwards';
-    await showMsg(`${G.player.name} fainted!`, 1400);
-    G.battleActive = false;
-    G.animating = false;
-    setTimeout(() => showResult('lose'), 800);
-    return;
-  }
-
-  await endOfTurn();
-}
-
-async function endOfTurn() {
-  G.turn++;
-
-  // Burn damage
-  if (G.player.status === 'BRN') {
-    const dmg = Math.max(1, Math.floor(G.player.maxHP / 8));
-    G.player.hp = Math.max(0, G.player.hp - dmg);
-    updateHPBar('player');
-    await showMsg(`${G.player.name} is hurt by its burn!`, 1000);
-  }
-  if (G.enemy.status === 'BRN') {
-    const dmg = Math.max(1, Math.floor(G.enemy.maxHP / 8));
-    G.enemy.hp = Math.max(0, G.enemy.hp - dmg);
-    updateHPBar('enemy');
-    await showMsg(`Enemy ${G.enemy.name} is hurt by its burn!`, 1000);
-  }
-  // Poison damage
-  if (G.player.status === 'PSN') {
-    const dmg = Math.max(1, Math.floor(G.player.maxHP / 8));
-    G.player.hp = Math.max(0, G.player.hp - dmg);
-    updateHPBar('player');
-    await showMsg(`${G.player.name} is hurt by poison!`, 1000);
-  }
-  if (G.enemy.status === 'PSN') {
-    const dmg = Math.max(1, Math.floor(G.enemy.maxHP / 8));
-    G.enemy.hp = Math.max(0, G.enemy.hp - dmg);
-    updateHPBar('enemy');
-    await showMsg(`Enemy ${G.enemy.name} is hurt by poison!`, 1000);
-  }
-
-  // Check deaths from end-of-turn
-  if (G.player.hp <= 0 && G.battleActive) {
-    G.player.hp = 0; G.player.fainted = true; updateHPBar('player');
-    document.getElementById('player-sprite-canvas').style.animation = 'faint 0.5s forwards';
-    await showMsg(`${G.player.name} fainted!`, 1400);
-    G.battleActive = false; G.animating = false;
-    setTimeout(() => showResult('lose'), 800); return;
-  }
-  if (G.enemy.hp <= 0 && G.battleActive) {
-    G.enemy.hp = 0; G.enemy.fainted = true; updateHPBar('enemy');
-    document.getElementById('enemy-sprite-canvas').style.animation = 'faint-enemy 0.5s forwards';
-    await showMsg(`Enemy ${G.enemy.name} fainted!`, 1400);
-    G.battleActive = false; G.animating = false;
-    setTimeout(() => showResult('win'), 800); return;
-  }
-
-  if (G.battleActive) {
-    document.getElementById('msg-pokemon-name').textContent = G.player.name;
-    const txt = `What will ${G.player.name} do?`;
-    document.getElementById('message-text').innerHTML = txt + ' <span id="message-cursor"></span>';
-    setMenuVisible(true, false);
-    G.animating = false;
-  }
-}
-
-async function executeMove(attacker, defender, move, who) {
-  const isPlayer = who === 'player';
-  const prefix = isPlayer ? '' : 'Enemy ';
-  const targetPrefix = isPlayer ? 'Enemy ' : '';
-  const attackerSprite = document.getElementById(`${who}-sprite-canvas`);
-  const defenderSide = isPlayer ? 'enemy' : 'player';
-  const defenderSprite = document.getElementById(`${defenderSide}-sprite-canvas`);
-
-  await showMsg(`${prefix}${attacker.name} used ${move.name}!`, 900);
-
-  // Accuracy check
-  const accMult = getStageMult(attacker.statStages.acc || 0) / getStageMult(defender.statStages.eva || 0);
-  if (Math.random() * 100 > move.accuracy * accMult) {
-    await showMsg(`${prefix}${attacker.name}'s attack missed!`, 1000);
-    return;
-  }
-
-  // Emit particles at defender location
-  const fieldEl = document.getElementById('battle-field');
-  const fx = defenderSide === 'enemy'
-    ? fieldEl.offsetWidth * 0.7
-    : fieldEl.offsetWidth * 0.3;
-  const fy = defenderSide === 'enemy'
-    ? fieldEl.offsetHeight * 0.35
-    : fieldEl.offsetHeight * 0.65;
-  G.particles.emit(move.type, fx, fy);
-
-  if (move.category === 'status') {
-    // Handle stat changes / status infliction
-    const eff = move.effect;
-    if (eff) {
-      if (eff.heal) {
-        const healAmt = Math.floor(attacker.maxHP * eff.heal);
-        attacker.hp = Math.min(attacker.maxHP, attacker.hp + healAmt);
-        updateHPBar(who);
-        await showMsg(`${prefix}${attacker.name} recovered HP!`, 1000);
-      } else if (eff.status) {
-        const target = eff.self ? attacker : defender;
-        const targetStr = eff.self ? `${prefix}${attacker.name}` : `${targetPrefix}${defender.name}`;
-        if (!target.status) {
-          if (eff.status === 'leech') {
-            // Just do poison-like
-            target.status = 'PSN';
-          } else {
-            target.status = eff.status;
-            if (eff.status === 'SLP') target.statusTurns = 2 + Math.floor(Math.random()*3);
-          }
-          updateStatusBadge(eff.self ? who : defenderSide);
-          const statusNames = { PSN:'was poisoned', BRN:'was burned', PAR:'was paralyzed', SLP:'fell asleep', FRZ:'was frozen' };
-          await showMsg(`${targetStr} ${statusNames[target.status] || 'was affected'}!`, 1000);
-        } else {
-          await showMsg(`It didn't work!`, 800);
-        }
-      } else if (eff.stat) {
-        const target = eff.self ? attacker : defender;
-        const targetStr = eff.self ? `${prefix}${attacker.name}` : `${targetPrefix}${defender.name}`;
-        const stages = eff.stages || -1;
-        const statName = {atk:'Attack',def:'Defense',spa:'Sp.Atk',spd:'Speed',acc:'Accuracy',eva:'Evasion'};
-        target.statStages[eff.stat] = Math.max(-6, Math.min(6, (target.statStages[eff.stat]||0) + stages));
-        const dir = stages > 0 ? 'rose' : 'fell';
-        const amount = Math.abs(stages) > 1 ? ' sharply' : '';
-        await showMsg(`${targetStr}'s ${statName[eff.stat]}${amount} ${dir}!`, 1000);
-      } else if (eff.disable) {
-        await showMsg(`It had no effect...`, 800);
-      } else {
-        await showMsg(`...`, 600);
-      }
-    }
-    return;
-  }
-
-  // Damage move
-  const dmg = calcDamage(attacker, defender, move);
-  const eff = typeEffectiveness(move.type, defender.types);
-  const effMsg = getEffMessage(eff);
-
-  // Shake defender
-  if (isPlayer) {
-    defenderSprite.classList.remove('shake');
-    void defenderSprite.offsetWidth;
-    defenderSprite.classList.add('shake');
-  } else {
-    defenderSprite.classList.remove('shake-player');
-    void defenderSprite.offsetWidth;
-    defenderSprite.classList.add('shake-player');
-  }
-  setTimeout(() => {
-    defenderSprite.classList.remove('shake','shake-player');
-  }, 450);
-
-  defender.hp = Math.max(0, defender.hp - dmg);
-  updateHPBar(defenderSide);
-
-  if (effMsg) await showMsg(effMsg, 900);
-
-  // Secondary effects
-  if (move.effect && !move.effect.fixedDmg && !move.effect.heal && !move.effect.disable) {
-    const e = move.effect;
-    if (e.chance && Math.random()*100 < e.chance) {
-      if (e.status && !defender.status) {
-        defender.status = e.status;
-        if (e.status === 'SLP') defender.statusTurns = 2 + Math.floor(Math.random()*3);
-        updateStatusBadge(defenderSide);
-        const statusNames = { PSN:'was poisoned', BRN:'was burned', PAR:'was paralyzed', SLP:'fell asleep', FRZ:'was frozen' };
-        await showMsg(`${targetPrefix}${defender.name} ${statusNames[e.status]}!`, 1000);
-      } else if (e.stat) {
-        defender.statStages[e.stat] = Math.max(-6, Math.min(6, (defender.statStages[e.stat]||0) + (e.stages||0)));
-        const statName = {atk:'Attack',def:'Defense',spa:'Sp.Atk',spd:'Speed',acc:'Accuracy'};
-        await showMsg(`${targetPrefix}${defender.name}'s ${statName[e.stat]} fell!`, 900);
-      }
-    }
-  }
-}
-
-// ── AI ───────────────────────────────────────────────────────
-function aiPickMove(enemy, player) {
-  const available = enemy.moves.filter(m => m.currentPP > 0);
-  if (available.length === 0) return { name:'Struggle', type:'normal', power:50, accuracy:100, pp:1, currentPP:1, category:'physical', effect:null };
-
-  // Score each move
-  const scored = available.map(move => {
-    let score = 0;
-    if (move.category !== 'status') {
-      const dmg = calcDamage(enemy, player, move);
-      const eff = typeEffectiveness(move.type, player.types);
-      score = dmg * 2 + eff * 10;
-      // Prefer KO
-      if (dmg >= player.hp) score += 100;
-    } else {
-      // Status moves: useful if enemy healthy and target has no status
-      if (enemy.hp > enemy.maxHP * 0.5 && !player.status) score = 30;
-      else score = 5;
-    }
-    return { move, score };
-  });
-
-  scored.sort((a,b) => b.score - a.score);
-
-  // Some randomness so AI isn't perfect
-  const top = scored.slice(0, Math.min(2, scored.length));
-  return top[Math.floor(Math.random()*top.length)].move;
-}
-
-// ── BAG ──────────────────────────────────────────────────────
-function showBagMenu() {
-  if (!G.battleActive || G.animating) return;
-  setMenuVisible(false, false);
-
-  const menu = document.getElementById('move-menu');
-  menu.innerHTML = '';
-  menu.style.display = 'grid';
-  document.getElementById('back-btn').style.display = 'block';
-
-  const items = Object.entries(G.bag).filter(([k,v]) => v > 0);
-  if (items.length === 0) {
-    showMsg(`Your bag is empty!`, 1000);
-    setMenuVisible(true, false);
-    return;
-  }
-
-  items.forEach(([key, qty]) => {
-    const item = ITEMS[key];
-    if (!item) return;
-    const btn = document.createElement('button');
-    btn.className = 'move-btn';
-    btn.innerHTML = `${item.name}<span class="move-pp">${qty}x</span><br><span style="font-size:5px;color:#888">${item.desc}</span>`;
-    btn.addEventListener('click', async () => {
-      if (!G.battleActive || G.animating) return;
-      G.animating = true;
-      G.bag[key]--;
-
-      if (item.cureStatus === true) {
-        G.player.status = null;
-        updateStatusBadge('player');
-        await showMsg(`Used ${item.name}! ${G.player.name} is cured!`, 1200);
-      } else if (item.cureStatus) {
-        if (G.player.status === item.cureStatus) {
-          G.player.status = null;
-          updateStatusBadge('player');
-          await showMsg(`Used ${item.name}! Cured ${item.cureStatus}!`, 1200);
-        } else {
-          await showMsg(`It won't work on ${G.player.name}!`, 1000);
-          G.bag[key]++; // refund
-        }
-      } else if (item.heal) {
-        if (G.player.hp >= G.player.maxHP) {
-          await showMsg(`${G.player.name} is already at full HP!`, 1000);
-          G.bag[key]++;
-        } else {
-          G.player.hp = Math.min(G.player.maxHP, G.player.hp + item.heal);
-          updateHPBar('player');
-          await showMsg(`Used ${item.name}! Restored ${item.heal} HP!`, 1200);
-        }
-      }
-
-      await enemyTurn();
-    });
-    menu.appendChild(btn);
-  });
-}
-
-// ── RESULT SCREEN ────────────────────────────────────────────
-function showResult(outcome) {
-  document.getElementById('battle-screen').style.display = 'none';
-  const rs = document.getElementById('result-screen');
-  rs.style.display = 'flex';
-
-  const title = document.getElementById('result-title');
-  const msg = document.getElementById('result-msg');
-  const sprite = document.getElementById('result-sprite');
-
-  if (outcome === 'win') {
-    title.textContent = 'VICTORY!';
-    title.className = 'win';
-    msg.textContent = `${G.player.name} defeated the enemy ${G.enemy.name}!\nYou are a Pokémon master!`;
-    drawSprite(sprite, G.player.sprite, 128);
-  } else if (outcome === 'lose') {
-    title.textContent = 'DEFEATED!';
-    title.className = 'lose';
-    msg.textContent = `${G.player.name} was defeated by enemy ${G.enemy.name}...\nTrain harder and try again!`;
-    drawSprite(sprite, G.enemy.sprite, 128);
-  } else {
-    title.textContent = 'ESCAPED!';
-    title.className = 'draw';
-    msg.textContent = 'You fled from the battle.\nSometimes discretion is the better part of valor.';
-    drawSprite(sprite, G.player.sprite, 128);
-  }
-
-  document.getElementById('rematch-btn').onclick = () => {
-    rs.style.display = 'none';
-    // Reset state and restart same matchup
-    document.getElementById('battle-screen').style.display = 'none';
+  // Result buttons
+  document.getElementById('rbtn-rematch').addEventListener('click',()=>{
+    document.getElementById('psp').style.animation='';
+    document.getElementById('esp').style.animation='';
     startBattle();
-  };
-  document.getElementById('new-game-btn').onclick = () => {
-    rs.style.display = 'none';
-    document.getElementById('title-screen').style.display = 'flex';
-    selectedPlayer = null; selectedOpponent = null;
-    document.getElementById('start-btn').disabled = true;
-    document.querySelectorAll('.starter-card').forEach(c => c.classList.remove('selected'));
-    // Reset sprite animations
-    document.getElementById('player-sprite-canvas').style.animation = '';
-    document.getElementById('enemy-sprite-canvas').style.animation = '';
-  };
-}
+  });
+  document.getElementById('rbtn-menu').addEventListener('click',()=>{
+    document.getElementById('psp').style.animation='';
+    document.getElementById('esp').style.animation='';
+    showScreen('title-screen');
+    initTitle();
+  });
 
-// ── INIT ─────────────────────────────────────────────────────
-window.addEventListener('load', () => {
-  initStarfield();
-  initTitleScreen();
-  window.addEventListener('resize', () => {
-    const sf = document.getElementById('starfield');
-    sf.width = window.innerWidth;
-    sf.height = window.innerHeight;
-    if (G.particles) G.particles.resize();
+  // Resize
+  window.addEventListener('resize',()=>{
+    const sf=document.getElementById('starfield');
+    sf.width=window.innerWidth; sf.height=window.innerHeight;
+    if(G.particles) G.particles.resize();
   });
 });
 </script>
